@@ -6,7 +6,7 @@ import { indentOnInput, syntaxHighlighting, defaultHighlightStyle, bracketMatchi
 import { history, defaultKeymap, historyKeymap, insertTab } from '@codemirror/commands';
 import { highlightSelectionMatches, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { markdown } from '@codemirror/lang-markdown';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { css } from '@codemirror/lang-css';
 import { vsCodeDark } from "@fsegurai/codemirror-theme-vscode-dark";
 import './style.css';
@@ -71,7 +71,9 @@ function setupCodeMirror(target) {
                     target.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }),
-            isCss ? css() : markdown(),
+            isCss ? css() : markdown({
+                base: markdownLanguage
+            }),
             vsCodeDark,
         ],
         parent: host,
