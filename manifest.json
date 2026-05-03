@@ -1,12 +1,12 @@
 {
-    "display_name": "CodeMirror",
+    "display_name": "PromptMirror",
     "loading_order": 999,
     "requires": [],
     "optional": [],
     "js": "dist/index.js",
     "css": "",
-    "author": "Cohee1207",
+    "author": "CasualAutopsy",
     "version": "1.0.0",
-    "homePage": "https://github.com/SillyTavern/Extension-CodeMirror",
+    "homePage": "https://github.com/CasualAutopsy/Extension-PromptMirror",
     "auto_update": true
 }
