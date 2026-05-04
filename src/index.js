@@ -9,7 +9,9 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { css } from '@codemirror/lang-css';
 import { vsCodeDark } from "@fsegurai/codemirror-theme-vscode-dark";
+
 import './style.css';
+import { codeBlockLangs } from './highlighting/codeblocks.js';
 
 const { isMobile } = SillyTavern.getContext();
 
@@ -72,6 +74,7 @@ function setupCodeMirror(target) {
                 }
             }),
             isCss ? css() : markdown({
+                codeLanguages: codeBlockLangs,
                 base: markdownLanguage
             }),
             vsCodeDark,
