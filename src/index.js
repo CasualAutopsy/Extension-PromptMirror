@@ -12,6 +12,7 @@ import { vsCodeDark } from "@fsegurai/codemirror-theme-vscode-dark";
 
 import './style.css';
 import { codeBlockLangs } from './highlighting/codeblocks.js';
+import { macroHandlebars } from './highlighting/md_extensions.js';
 
 const { isMobile } = SillyTavern.getContext();
 
@@ -75,6 +76,7 @@ function setupCodeMirror(target) {
             }),
             isCss ? css() : markdown({
                 codeLanguages: codeBlockLangs,
+                extensions: macroHandlebars,
                 base: markdownLanguage
             }),
             vsCodeDark,
