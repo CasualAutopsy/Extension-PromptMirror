@@ -91,7 +91,8 @@ async function setupCodeMirror(target) {
             // extension_settings.promptmirror.theme.base_colours.dark
             //     ? (await import('@fsegurai/codemirror-theme-vscode-dark')).vsCodeDark
             //     : (await import('@fsegurai/codemirror-theme-vscode-light')).vsCodeLight,
-            (await import('@fsegurai/codemirror-theme-vscode-dark')).vsCodeDark,
+            // (await import('./themes/fsegurai/dark.js')).vsCodeDark,
+            (await import('./themes/fsegurai/dark.js')).packTheme(),
         ],
         parent: host,
     });

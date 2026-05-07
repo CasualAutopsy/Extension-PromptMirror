@@ -95,6 +95,44 @@ export async function loadSettings() {
 }
 
 export function registerListeners() {
+    // Emergency Debug Button
+    $('#alpha_debug_button').on('click', () => {
+        extension_settings.promptmirror = {
+            theme: {
+                presets: {
+                    current: 'Default (Dark) - By fsegurai',
+                    list: [...default_theme_presets]
+                },
+                base_colours: {
+                    dark: true,
+                },
+                accent_colours: {
+                    accent01: 'rgb(86, 156, 214)',    // Headers, Bold
+                    accent02: 'rgb(197, 134, 192)',   // Macro Wrapping(cycle 1), Links, Images
+                    accent03: 'rgb(156, 220, 254)',   // Macro Wrapping(cycle 2)
+                    accent04: 'rgb(78, 201, 176)',    // Macro Wrapping(cycle 3), Emphasis, Emph-Bold
+                    accent05: 'rgb(220, 220, 170)',   // Macro Labels, Code Blocks(shortcodes)
+                    accent06: 'rgb(206, 145, 120)',   // Macro Arg Separators, Lists, Tabels, Code
+                    accent07: 'rgb(244, 71, 71)',     // Strikethrough
+                    accent08: 'rgb(106, 153, 85)',    // Quotes, Comment Macros
+                    accent09: 'rgb(181, 206, 168)',   // Other 1(other languages)
+                    accent10: 'rgb(215, 186, 125)',   // Other 2(other languages)
+                },
+            },
+            features: {
+                presets: {
+                    current: 'Default',
+                    list: [...default_feature_presets]
+                },
+                gutter: {
+                    showLineNum: false,
+                },
+            }
+        };
+
+        loadSettings();
+    })
+
     $('#promptmirror_line_numbers').on('click', function() {
         extension_settings.promptmirror.features.gutter.showLineNum = $('#promptmirror_line_numbers').prop('checked');
         saveSettingsDebounced();

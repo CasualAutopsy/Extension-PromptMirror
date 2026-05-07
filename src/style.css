@@ -13,21 +13,8 @@ dialog.popup:has(.codemirror-host) {
     width: 100%;
 }
 
-.codemirror-host .cm-editor .cm-activeLine {
-    background-color: rgba(200, 200, 200, 0.05);
-}
-
 .codemirror-host .cm-editor {
     height: 100%;
-}
-
-.codemirror-host .cm-editor .cm-content {
-    font-family: var(--monoFontFamily);
-}
-
-.codemirror-host .cm-editor.cm-focused  .cm-selectionLayer .cm-selectionBackground,
-.codemirror-host .cm-editor .cm-selectionBackground  {
-    background: rgba(200, 200, 200, 0.15);
 }
 
 .codemirror-host .cm-editor .cm-cursor {
@@ -35,7 +22,7 @@ dialog.popup:has(.codemirror-host) {
 }
 
 .codemirror-host .cm-editor input[type="checkbox"] {
-    display: inline-flex;
+    display: inline-grid;
 }
 
 .codemirror-host .cm-editor .cm-panels {
@@ -50,7 +37,6 @@ dialog.popup:has(.codemirror-host) {
     color: var(--SmartThemeBodyColor);
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 5px;
-    font-family: var(--mainFontFamily);
     padding: 3px 5px;
     margin: 5px 0;
     height: fit-content;
