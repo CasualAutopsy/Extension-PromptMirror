@@ -26,23 +26,23 @@ export const macroHandlebars = {
     defineNodes: [
         {
             name: "Handlebar",
-            style: t.handleBar
+            style: t.labelName
         },
         {
             name: "HandlebarMark_1",
-            style: t.hbCycle1
+            style: t.link
         },
         {
             name: "HandlebarMark_2",
-            style: t.hbCycle2
+            style: t.color
         },
         {
             name: "HandlebarMark_3",
-            style: t.hbCycle3
+            style: t.typeName
         },
         {
             name: "HandlebarLabelMark",
-            style: t.hbLabelPrefix
+            style: t.processingInstruction
         }
     ],
     parseInline: [{
@@ -133,7 +133,7 @@ export const macroHandlebars = {
 
                 // Argument mark handling.
                 if (next == 58 /* ':' */ && cx.char(i + 1) == 58) {
-                    elts.push(cx.elt("ListMark", i, i + 2));
+                    elts.push(cx.elt("HandlebarLabelMark", i, i + 2));
 
                     i++; // Skip the next ':' as we've already consumed it.
                     continue;
@@ -142,18 +142,3 @@ export const macroHandlebars = {
         }
     }],
 };
-
-
-
-
-const handlebarHighlightStyle = HighlightStyle.define([
-    { tag: t.handleBar, color: '#dcdcaa', fontStyle: 'normal' },
-
-    { tag: t.hbCycle1, color: '#c586c0' },
-    { tag: t.hbCycle2, color: '#9cdcfe' },
-    { tag: t.hbCycle3, color: '#4ec9b0' },
-
-    { tag: t.hbLabelPrefix, color: '#ce9178' },
-])
-
-export const handlebarTheme = [syntaxHighlighting(handlebarHighlightStyle)];

@@ -1,0 +1,93 @@
+<div id="promptmirror_settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>PromptMirror</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="title_restorable">
+                <span>Theme Settings</span>
+            </div>
+
+            <strong>Theme Preset:</strong>
+            <div class="flex-container marginTop5">
+                <select id="promptmirror_theme_preset" class="text_pole flex1" disabled="">
+                    <option value="" selected="">WIP</option>
+                </select>
+                <div id="promptmirror_theme_import" class="menu_button fa-solid fa-file-import sttt--enabled interactable" data-sttt--title="Import a new theme" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_export" class="menu_button fa-solid fa-file-export sttt--enabled interactable" data-sttt--title="Export an existing theme" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_update" class="menu_button fa-solid fa-save sttt--enabled interactable" data-sttt--title="Update existing theme" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_create" class="menu_button fa-solid fa-file-circle-plus sttt--enabled interactable" data-sttt--title="Create a new theme" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_reload" class="menu_button fa-solid fa-arrows-rotate sttt--enabled interactable" data-sttt--title="Reload theme data" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_delete" class="menu_button fa-solid fa-trash-can sttt--enabled interactable" data-sttt--title="Delete an existing theme" tabindex="0" role="button"></div>
+            </div>
+            <hr/>
+
+            <label class="checkbox_label" for="promptmirror_dark_mode">
+                <input id="promptmirror_dark_mode" type="checkbox" class="checkbox"/>
+                <small>(WIP)Dark Mode</small>
+            </label>
+            <br/>
+            <div class="inline-drawer">
+                <div class="inline-drawer-toggle inline-drawer-header">
+                    <b>Accent Colours</b>
+                    <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                </div>
+                <div class="inline-drawer-content">
+                    <small>You must refresh the page to see the changes</small>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent01" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 01 - Headers, Bold</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent02" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 02 - Macro Wrapping(cycle 1), Links, Images</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent03" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 03 - Macro Wrapping(cycle 2)</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent04" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 04 - Macro Wrapping(cycle 3), Emphasis, Emph-Bold</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent05" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 05 - Macro Labels, Code Blocks(shortcodes)</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent06" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 06 - Macro Arg Separators, Lists, Tables, Code</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent07" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 07 - Strikethrough</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent08" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 08 - Quotes, Comment Macros</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent09" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 09 - Other 1(other languages)</span>
+                    </div>
+                    <div class="flex-container">
+                        <toolcool-color-picker id="promptmirror_accent10" color="#b00b1e"></toolcool-color-picker>
+                        <span>Accent 10 - Other 2(other languages)</span>
+                    </div>
+                </div>
+            </div>
+            <br/>
+            <div class="title_restorable">
+                <span>Feature Settings</span>
+            </div>
+
+            <strong>Gutter Settings:</strong>
+            <label class="checkbox_label" for="promptmirror_line_numbers">
+                <input id="promptmirror_line_numbers" type="checkbox" class="checkbox"/>
+                <small>Show Line Numbers</small>
+            </label>
+            <hr/>
+        </div>
+    </div>
+</div>

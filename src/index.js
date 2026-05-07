@@ -1,20 +1,29 @@
 import { EditorView } from 'codemirror';
-import { highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine, keymap } from '@codemirror/view';
+import { highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 export { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { indentOnInput, syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+import { indentOnInput, bracketMatching } from '@codemirror/language';
 import { history, defaultKeymap, historyKeymap, insertTab } from '@codemirror/commands';
 import { highlightSelectionMatches, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { css } from '@codemirror/lang-css';
-import { vsCodeDark } from "@fsegurai/codemirror-theme-vscode-dark";
 
 import './style.css';
 import { codeBlockLangs } from './highlighting/codeblocks.js';
-import { macroHandlebars, handlebarTheme } from './highlighting/md_extensions.js';
+import { macroHandlebars } from './highlighting/md_extensions.js';
+import { loadSettings, registerListeners, extensionPath } from './settings/settings.js';
 
+const { extension_settings } = await import(/* webpackIgnore: true */ '/scripts/extensions.js');
 const { isMobile } = SillyTavern.getContext();
+
+jQuery(async () => {
+    const settingsHtml = await $.get(`${extensionPath}/settings/settings.html`);
+    $('#extensions_settings').append(settingsHtml);
+
+    registerListeners();
+    loadSettings();
+});
 
 const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
@@ -39,7 +48,7 @@ observer.observe(document.body, {
  * Setup CodeMirror for the target textarea element.
  * @param {HTMLTextAreaElement} target
  */
-function setupCodeMirror(target) {
+async function setupCodeMirror(target) {
     const host = document.createElement('div');
     host.classList.add('codemirror-host');
     target.classList.add('displayNone');
@@ -55,7 +64,6 @@ function setupCodeMirror(target) {
             dropCursor(),
             EditorState.allowMultipleSelections.of(true),
             indentOnInput(),
-            syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
             bracketMatching(),
             closeBrackets(),
             highlightActiveLine(),
@@ -74,13 +82,16 @@ function setupCodeMirror(target) {
                     target.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }),
+            extension_settings.promptmirror.features.gutter.showLineNum ? lineNumbers() : [],
             isCss ? css() : markdown({
                 codeLanguages: codeBlockLangs,
                 extensions: macroHandlebars,
                 base: markdownLanguage
             }),
-            vsCodeDark,
-            handlebarTheme,
+            // extension_settings.promptmirror.theme.base_colours.dark
+            //     ? (await import('@fsegurai/codemirror-theme-vscode-dark')).vsCodeDark
+            //     : (await import('@fsegurai/codemirror-theme-vscode-light')).vsCodeLight,
+            (await import('@fsegurai/codemirror-theme-vscode-dark')).vsCodeDark,
         ],
         parent: host,
     });
@@ -107,3 +118,7 @@ function setupCodeMirror(target) {
         });
     }
 }
+
+
+
+
