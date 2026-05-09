@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { EditorView } from 'codemirror';
 import { highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view';
 export { EditorView } from '@codemirror/view';
@@ -32,6 +33,7 @@ const observer = new MutationObserver((mutations) => {
                 if (node instanceof HTMLDialogElement) {
                     const target = node.querySelector('textarea.maximized_textarea');
                     if (target) {
+                        // @ts-ignore
                         setupCodeMirror(target);
                     }
                 }
@@ -57,7 +59,6 @@ async function setupCodeMirror(target) {
     const editor = new EditorView({
         doc: target.value,
         extensions: [
-            highlightActiveLineGutter(),
             highlightSpecialChars(),
             history(),
             drawSelection(),
@@ -82,16 +83,20 @@ async function setupCodeMirror(target) {
                     target.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }),
-            extension_settings.promptmirror.features.gutter.showLineNum ? lineNumbers() : [],
+            extension_settings.promptmirror.features.gutter.showLineNum
+                ? [
+                    lineNumbers(),
+                    highlightActiveLineGutter()
+                ]
+                : [],
             isCss ? css() : markdown({
                 codeLanguages: codeBlockLangs,
                 extensions: macroHandlebars,
                 base: markdownLanguage
             }),
             // extension_settings.promptmirror.theme.base_colours.dark
-            //     ? (await import('@fsegurai/codemirror-theme-vscode-dark')).vsCodeDark
-            //     : (await import('@fsegurai/codemirror-theme-vscode-light')).vsCodeLight,
-            // (await import('./themes/fsegurai/dark.js')).vsCodeDark,
+            //     ? (await import('./themes/fsegurai/dark.js')).packTheme()
+            //     : (await import('./themes/fsegurai/light.js')).packTheme(),
             (await import('./themes/fsegurai/dark.js')).packTheme(),
         ],
         parent: host,

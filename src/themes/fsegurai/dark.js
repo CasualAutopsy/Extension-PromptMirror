@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { EditorView } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
@@ -230,7 +231,7 @@ export function packTheme() {
             borderLeftWidth: generalCursor.borderLeftWidth,
         },
         '.cm-fat-cursor': {
-            backgroundColor: `${themeColours.ui_colours.cursor}99`,
+            backgroundColor: `${themeColours.ui_colours.cursor}`,
             color: themeColours.base_colours.background_primary,
         },
         // Selection
@@ -244,7 +245,7 @@ export function packTheme() {
         // Search functionality
         '.cm-searchMatch': {
             backgroundColor: '#72a1ff40',
-            outline: `1px solid ${themeColours.ui_colours.diagnosticWarning}90`,
+            outline: `1px solid ${themeColours.ui_colours.diagnosticWarning}`,
             color: themeColours.base_colours.foreground_secondary,
             borderRadius: generalSearchField.borderRadius,
         },
@@ -283,7 +284,7 @@ export function packTheme() {
         },
         '.cm-panel button:hover': {
             backgroundColor: '#3a3a3a',
-            border: `1px solid ${themeColours.base_colours.invisables}80`,
+            border: `1px solid ${themeColours.base_colours.invisables}`,
         },
         // Line highlighting
         '.cm-activeLine': {
@@ -334,7 +335,7 @@ export function packTheme() {
             color: themeColours.diff_colours.addedText,
             padding: generalDiff.insertedLinePadding,
             borderRadius: generalDiff.borderRadius,
-            border: `1px solid ${themeColours.diff_colours.addedText}40`,
+            border: `1px solid ${themeColours.diff_colours.addedText}`,
         },
         'ins.cm-insertedLine .cm-changedText': {
             background: 'transparent !important',
@@ -353,7 +354,7 @@ export function packTheme() {
             color: themeColours.diff_colours.removedText,
             padding: generalDiff.insertedLinePadding,
             borderRadius: generalDiff.borderRadius,
-            border: `1px solid ${themeColours.diff_colours.removedText}40`,
+            border: `1px solid ${themeColours.diff_colours.removedText}`,
         },
         'del .cm-deletedText, del .cm-changedText': {
             background: 'transparent !important',
@@ -419,25 +420,25 @@ export function packTheme() {
         // Matching brackets
         '.cm-matchingBracket': {
             backgroundColor: themeColours.ui_colours.activeBracketBg,
-            outline: `1px solid ${themeColours.ui_colours.activeBracketBorder}80`,
+            outline: `1px solid ${themeColours.ui_colours.activeBracketBorder}`,
             borderRadius: generalMatching.borderRadius,
         },
         '.cm-nonmatchingBracket': {
-            backgroundColor: `${themeColours.base_colours.accent07}80`,
+            backgroundColor: `${themeColours.base_colours.accent07}`,
             outline: `1px solid ${themeColours.ui_colours.invalid}`,
             borderRadius: generalMatching.borderRadius,
         },
         // Selection matches
         '.cm-selectionMatch': {
             backgroundColor: themeColours.ui_colours.selectionMatch,
-            outline: `1px solid ${themeColours.base_colours.selection}70`,
+            outline: `1px solid ${themeColours.base_colours.selection}`,
             borderRadius: generalMatching.borderRadius,
         },
         // Fold placeholder
         '.cm-foldPlaceholder': {
             backgroundColor: themeColours.ui_colours.tooltipBackground,
             color: themeColours.base_colours.invisables,
-            border: `1px dotted ${themeColours.base_colours.invisables}70`,
+            border: `1px dotted ${themeColours.base_colours.invisables}`,
             borderRadius: generalPlaceholder.borderRadius,
             padding: generalPlaceholder.padding,
             margin: generalPlaceholder.margin,

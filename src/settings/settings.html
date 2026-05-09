@@ -7,20 +7,26 @@
         <div class="inline-drawer-content">
             <div class="title_restorable">
                 <span>Theme Settings</span>
-                <div id="alpha_debug_button" class="menu_button fa-solid fa-bug-slash sttt--enabled interactable" data-sttt--title="Reload theme data" tabindex="0" role="button"></div>
+                <div class="flex-container marginTop5">
+                    <div id="alpha_debug_button" class="menu_button fa-solid fa-bug-slash interactable" tabindex="0" role="button"></div>
+                    <div id="promptmirror_master_import" class="menu_button fa-solid fa-file-import interactable" tabindex="0" role="button" disabled=""></div>
+                    <div id="promptmirror_master_export" class="menu_button fa-solid fa-file-export interactable" tabindex="0" role="button" disabled=""></div>
+                </div>
             </div>
 
             <strong>Theme Preset:</strong>
             <div class="flex-container marginTop5">
-                <select id="promptmirror_theme_preset" class="text_pole flex1" disabled="">
-                    <option value="" selected="">WIP</option>
+                <select id="promptmirror_theme_preset" class="text_pole flex1">
+                    <option value="" selected="">Error - If you see this, make a bug report!</option>
                 </select>
-                <div id="promptmirror_theme_import" class="menu_button fa-solid fa-file-import sttt--enabled interactable" data-sttt--title="Import a new theme" tabindex="0" role="button"></div>
-                <div id="promptmirror_theme_export" class="menu_button fa-solid fa-file-export sttt--enabled interactable" data-sttt--title="Export an existing theme" tabindex="0" role="button"></div>
-                <div id="promptmirror_theme_update" class="menu_button fa-solid fa-save sttt--enabled interactable" data-sttt--title="Update existing theme" tabindex="0" role="button"></div>
-                <div id="promptmirror_theme_create" class="menu_button fa-solid fa-file-circle-plus sttt--enabled interactable" data-sttt--title="Create a new theme" tabindex="0" role="button"></div>
-                <div id="promptmirror_theme_reload" class="menu_button fa-solid fa-arrows-rotate sttt--enabled interactable" data-sttt--title="Reload theme data" tabindex="0" role="button"></div>
-                <div id="promptmirror_theme_delete" class="menu_button fa-solid fa-trash-can sttt--enabled interactable" data-sttt--title="Delete an existing theme" tabindex="0" role="button"></div>
+                <input id="promptmirror_theme_import_file" type="file" hidden accept=".json" class="displayNone">
+                <div id="promptmirror_theme_import" class="menu_button fa-solid fa-file-import interactable" tabindex="0" role="button" disabled=""></div>
+                <div id="promptmirror_theme_export" class="menu_button fa-solid fa-file-export interactable" tabindex="0" role="button" disabled=""></div>
+                <div id="promptmirror_theme_update" class="menu_button fa-solid fa-save interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_rename" class="menu_button fa-solid fa-pencil interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_create" class="menu_button fa-solid fa-file-circle-plus interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_reload" class="menu_button fa-solid fa-arrows-rotate interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_theme_delete" class="menu_button fa-solid fa-trash-can interactable" tabindex="0" role="button"></div>
             </div>
             <hr/>
 
@@ -82,12 +88,51 @@
                 <span>Feature Settings</span>
             </div>
 
+            <strong>Feature Preset:</strong>
+            <div class="flex-container marginTop5">
+                <select id="promptmirror_feature_preset" class="text_pole flex1">
+                    <option value="" selected="">Error - If you see this, make a bug report!</option>
+                </select>
+                <input id="promptmirror_features_import_file" type="file" hidden accept=".json" class="displayNone">
+                <div id="promptmirror_feature_import" class="menu_button fa-solid fa-file-import interactable" tabindex="0" role="button" disabled=""></div>
+                <div id="promptmirror_feature_export" class="menu_button fa-solid fa-file-export interactable" tabindex="0" role="button" disabled=""></div>
+                <div id="promptmirror_feature_update" class="menu_button fa-solid fa-save interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_feature_rename" class="menu_button fa-solid fa-pencil interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_feature_create" class="menu_button fa-solid fa-file-circle-plus interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_feature_reload" class="menu_button fa-solid fa-arrows-rotate interactable" tabindex="0" role="button"></div>
+                <div id="promptmirror_feature_delete" class="menu_button fa-solid fa-trash-can interactable" tabindex="0" role="button"></div>
+            </div>
+            <hr/>
+
             <strong>Gutter Settings:</strong>
+            <br/>
             <label class="checkbox_label" for="promptmirror_line_numbers">
                 <input id="promptmirror_line_numbers" type="checkbox" class="checkbox"/>
                 <small>Show Line Numbers</small>
             </label>
-            <hr/>
+            <br/>
+
+            <strong>(WIP)Highlight Settings:</strong>
+            <br/>
+            <label class="checkbox_label" for="promptmirror_active_line">
+                <input id="promptmirror_active_line" type="checkbox" class="checkbox" disabled=""/>
+                <small>Active Line</small>
+            </label>
+
+            <label class="checkbox_label" for="promptmirror_draw_selection">
+                <input id="promptmirror_draw_selection" type="checkbox" class="checkbox" disabled=""/>
+                <small>Draw Selection</small>
+            </label>
+
+            <label class="checkbox_label" for="promptmirror_selection_match">
+                <input id="promptmirror_selection_match" type="checkbox" class="checkbox" disabled=""/>
+                <small>Selection Matches</small>
+            </label>
+
+            <label class="checkbox_label" for="promptmirror_bracket_matching">
+                <input id="promptmirror_bracket_matching" type="checkbox" class="checkbox" disabled=""/>
+                <small>Bracket Matching</small>
+            </label>
         </div>
     </div>
 </div>
