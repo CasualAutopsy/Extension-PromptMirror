@@ -1,0 +1,12 @@
+.pm-content {
+    margin-left: 5%;
+    margin-right: 5%;
+}
+
+.pm-divider {
+    margin-right: -3%;
+}
+
+#promptmirror_settings .disabled {
+    filter: brightness(0.5);
+}

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {tags as t, Tag} from '@lezer/highlight';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 
@@ -19,7 +20,37 @@ Object.assign(t, {
     hbLabelPrefix: hbLabelPrefix
 });
 
+/**
+ * @typedef { import('@lezer/markdown').BlockContext } BlockContext
+ * @typedef { import('@lezer/markdown').Line } Line
+ */
 
+/**
+ * Check if a character is a whitespace character.
+ *
+ * @param {number} ch - The character code
+ * @returns {boolean} The result
+ */
+function space(ch) {
+    return ch == 32
+    || ch == 9
+    || ch == 10
+    || ch == 13;
+}
+
+/**
+ *
+ * @param {BlockContext} cx
+ * @param {Line} line
+ */
+function isHandleBar(cx, line) {
+    if (
+        line.next != 123 /* '{' */                  ||
+        line.text.charCodeAt(line.pos + 1) == 123   ||
+        !space(line.text.charCodeAt(line.pos + 2))
+    ) return -1;
+
+}
 
 /** @type { import('@lezer/markdown').MarkdownConfig } */
 export const macroHandlebars = {
@@ -141,4 +172,12 @@ export const macroHandlebars = {
             }
         }
     }],
+    // parseBlock: [
+    //     {
+    //         name: "handlebars_blocks",
+    //         parse(cx, line) {
+
+    //         }
+    //     }
+    // ],
 };

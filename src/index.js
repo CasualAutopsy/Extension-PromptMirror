@@ -6,21 +6,27 @@ import { EditorState } from '@codemirror/state';
 import { indentOnInput, bracketMatching } from '@codemirror/language';
 import { history, defaultKeymap, historyKeymap, insertTab } from '@codemirror/commands';
 import { highlightSelectionMatches, searchKeymap, openSearchPanel } from '@codemirror/search';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { closeBrackets, closeBracketsKeymap, autocompletion } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { css } from '@codemirror/lang-css';
 
 import './style.css';
-import { codeBlockLangs } from './highlighting/codeblocks.js';
-import { macroHandlebars } from './highlighting/md_extensions.js';
+import { codeBlockLangs } from './syntax/codeblocks.js';
+import { macroHandlebars } from './syntax/handlebars.js';
 import { loadSettings, registerListeners, extensionPath } from './settings/settings.js';
+import { sillyInlineCompletion, charCardInlineCompletion } from './copilot/inline/inline.js';
 
 const { extension_settings } = await import(/* webpackIgnore: true */ '/scripts/extensions.js');
-const { isMobile } = SillyTavern.getContext();
+const { isMobile, TextCompletionService } = SillyTavern.getContext();
+
+
 
 jQuery(async () => {
     const settingsHtml = await $.get(`${extensionPath}/settings/settings.html`);
     $('#extensions_settings').append(settingsHtml);
+
+    const settingsCss = await $.get(`${extensionPath}/settings/settings.css`);
+    $('<style>').text(settingsCss).appendTo('head');
 
     registerListeners();
     loadSettings();
@@ -56,20 +62,40 @@ async function setupCodeMirror(target) {
     target.classList.add('displayNone');
     target.parentElement.appendChild(host);
     const isCss = target.dataset.for === 'customCSS';
+    const isCharacter = [
+        "description_textarea",
+        "personality_textarea",
+        "scenario_pole",
+        "firstmessage_textarea",
+        "mes_example_textarea"
+    ].includes(target.dataset.for);
     const editor = new EditorView({
         doc: target.value,
         extensions: [
             highlightSpecialChars(),
             history(),
-            drawSelection(),
             dropCursor(),
             EditorState.allowMultipleSelections.of(true),
             indentOnInput(),
-            bracketMatching(),
             closeBrackets(),
-            highlightActiveLine(),
+            extension_settings.promptmirror.features.highlighting.active_line
+                ? highlightActiveLine()
+                : [],
+            extension_settings.promptmirror.features.highlighting.draw_selection
+                ? drawSelection()
+                : [],
+            extension_settings.promptmirror.features.highlighting.selection_matches
+                ? highlightSelectionMatches()
+                : [],
+            extension_settings.promptmirror.features.highlighting.bracket_matching
+                ? bracketMatching()
+                : [],
             EditorView.lineWrapping,
-            highlightSelectionMatches(),
+            (extension_settings.promptmirror.copilot.inline.enabled
+                ? (isCharacter && extension_settings.promptmirror.copilot.inline.charCardEnabled
+                    ? charCardInlineCompletion(target.dataset.for)
+                    : sillyInlineCompletion())
+                : []),
             keymap.of([
                 ...closeBracketsKeymap,
                 ...defaultKeymap,
@@ -86,7 +112,9 @@ async function setupCodeMirror(target) {
             extension_settings.promptmirror.features.gutter.showLineNum
                 ? [
                     lineNumbers(),
-                    highlightActiveLineGutter()
+                    extension_settings.promptmirror.features.highlighting.active_line
+                        ? highlightActiveLineGutter()
+                        : []
                 ]
                 : [],
             isCss ? css() : markdown({
@@ -94,10 +122,7 @@ async function setupCodeMirror(target) {
                 extensions: macroHandlebars,
                 base: markdownLanguage
             }),
-            // extension_settings.promptmirror.theme.base_colours.dark
-            //     ? (await import('./themes/fsegurai/dark.js')).packTheme()
-            //     : (await import('./themes/fsegurai/light.js')).packTheme(),
-            (await import('./themes/fsegurai/dark.js')).packTheme(),
+            (await import('./themes/fsegurai.js')).packTheme(),
         ],
         parent: host,
     });

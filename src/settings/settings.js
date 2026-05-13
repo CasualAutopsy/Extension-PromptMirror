@@ -1,22 +1,29 @@
 // @ts-nocheck
-import { features } from 'process';
+import {
+    importTheme,
+    exportTheme,
+    createTheme, createFeature,
+    renameTheme, renameFeature,
+    updateTheme, updateFeature,
+    reloadTheme, reloadFeature,
+    deleteTheme, deleteFeature,
+    getThemePresetNameList, getFeaturePresetNameList
+} from './presets.js';
+
+import {loadInlineSettings, initInlineSettingListeners} from './../copilot/inline/settings.js';
 
 const { extension_settings } = await import(/* webpackIgnore: true */ '/scripts/extensions.js');
 const { saveSettingsDebounced } = await import(/* webpackIgnore: true */ '/script.js');
 const { parseJsonFile, download } = await import(/* webpackIgnore: true */ '/scripts/utils.js');
-const { Popup } = await import(/* webpackIgnore: true */ '/scripts/popup.js');
 
 export const extensionName = 'Extension-PromptMirror'
     , extensionPath = `scripts/extensions/third-party/${extensionName}/src`;
 
 const default_theme_presets = [
     {
-        version: '0.1',
+        version: '0.1.1',
         name: 'Default (Dark) - By fsegurai',
         data: {
-            base_colours: {
-                dark: true,
-            },
             accent_colours: {
                 accent01: 'rgb(86, 156, 214)',
                 accent02: 'rgb(197, 134, 192)',
@@ -35,7 +42,7 @@ const default_theme_presets = [
 
 const default_feature_presets = [
     {
-        version: '0.1',
+        version: '0.1.1',
         name: 'PromptMirror Lite',
         data: {
             gutter: {
@@ -51,12 +58,148 @@ const default_feature_presets = [
     }
 ];
 
+
+
+/**
+ * Ensure all expected settings properties exist with their default values.
+ * Missing keys are added automatically so future updates don't break old configs.
+ */
+function migrateSettings(settings) {
+    // metadata.version
+    if (typeof settings.metadata?.version !== 'string') {
+        settings.metadata = settings.metadata || {};
+        settings.metadata.version = '0.1';
+    }
+
+    // presets.theme
+    if (!settings.presets?.theme) {
+        settings.presets = settings.presets || {};
+        settings.presets.theme = {
+            current: 'Default (Dark) - By fsegurai',
+            list: [...default_theme_presets]
+        };
+    }
+    if (!settings.presets.theme.list) {
+        settings.presets.theme.list = [...default_theme_presets];
+    }
+
+    // presets.features
+    if (!settings.presets?.features) {
+        settings.presets = settings.presets || {};
+        settings.presets.features = {
+            current: 'PromptMirror Lite',
+            list: [...default_feature_presets]
+        };
+    }
+    if (!settings.presets.features.list) {
+        settings.presets.features.list = [...default_feature_presets];
+    }
+
+    // syntax.accent_colours
+    if (!settings.syntax) {
+        settings.syntax = {};
+    }
+    if (!settings.syntax.accent_colours) {
+        settings.syntax.accent_colours = {};
+    }
+    for (let i = 1; i <= 10; i++) {
+        const key = `accent${String(i).padStart(2, '0')}`;
+        if (typeof settings.syntax.accent_colours[key] !== 'string') {
+            settings.syntax.accent_colours[key] = default_theme_presets[0].data.accent_colours[key];
+        }
+    }
+
+    // features.gutter
+    if (!settings.features) {
+        settings.features = {};
+    }
+    if (!settings.features.gutter) {
+        settings.features.gutter = { showLineNum: false };
+    }
+    if (typeof settings.features.gutter.showLineNum !== 'boolean') {
+        settings.features.gutter.showLineNum = false;
+    }
+
+    // features.highlighting
+    if (!settings.features.highlighting) {
+        settings.features.highlighting = {
+            active_line: true,
+            draw_selection: true,
+            selection_matches: true,
+            bracket_matching: true,
+        };
+    }
+    if (typeof settings.features.highlighting.active_line !== 'boolean') {
+        settings.features.highlighting.active_line = true;
+    }
+    if (typeof settings.features.highlighting.draw_selection !== 'boolean') {
+        settings.features.highlighting.draw_selection = true;
+    }
+    if (typeof settings.features.highlighting.selection_matches !== 'boolean') {
+        settings.features.highlighting.selection_matches = true;
+    }
+    if (typeof settings.features.highlighting.bracket_matching !== 'boolean') {
+        settings.features.highlighting.bracket_matching = true;
+    }
+
+    // copilot.inline
+    if (!settings.copilot) {
+        settings.copilot = {};
+    }
+    if (!settings.copilot.inline) {
+        settings.copilot.inline = {
+            enabled: false,
+            api_type: 'llamacpp',
+            base_url: 'http://127.0.0.1:8080',
+            sequences: {
+                prefix: '<|fim_prefix|>',
+                suffix: '<|fim_suffix|>',
+                middle: '<|fim_middle|>',
+            },
+            template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
+            tc_preset: 'None'
+        };
+    }
+    const ci = settings.copilot.inline;
+    if (typeof ci.enabled !== 'boolean') ci.enabled = false;
+    if (typeof ci.api_type !== 'string') ci.api_type = 'llamacpp';
+    if (typeof ci.base_url !== 'string') ci.base_url = 'http://127.0.0.1:8080';
+    if (!ci.sequences) {
+        ci.sequences = { prefix: '<|fim_prefix|>', suffix: '<|fim_suffix|>', middle: '<|fim_middle|>' };
+    }
+    if (typeof ci.sequences.prefix !== 'string') ci.sequences.prefix = '<|fim_prefix|>';
+    if (typeof ci.sequences.suffix !== 'string') ci.sequences.suffix = '<|fim_suffix|>';
+    if (typeof ci.sequences.middle !== 'string') ci.sequences.middle = '<|fim_middle|>';
+    if (typeof ci.template !== 'string') ci.template = '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}';
+    if (typeof ci.tc_preset !== 'string') ci.tc_preset = 'None';
+    if (typeof ci.charCardEnabled !== 'boolean') ci.charCardEnabled = false;
+    if (!ci.charFields) {
+        ci.charFields = {
+            description: true,
+            personality: true,
+            scenario: true,
+            first_message: true,
+            example_dialogue: true,
+        };
+    }
+    if (typeof ci.charFields.description !== 'boolean') ci.charFields.description = true;
+    if (typeof ci.charFields.personality !== 'boolean') ci.charFields.personality = true;
+    if (typeof ci.charFields.scenario !== 'boolean') ci.charFields.scenario = true;
+    if (typeof ci.charFields.first_message !== 'boolean') ci.charFields.first_message = true;
+    if (typeof ci.charFields.example_dialogue !== 'boolean') ci.charFields.example_dialogue = true;
+
+    return settings;
+}
+
 /**
  * Load settings states from the extension_settings object
  */
 export async function loadSettings() {
     if ( !extension_settings.promptmirror ) {
         extension_settings.promptmirror = {
+            metadata: {
+                version: '0.1',
+            },
             presets: {
                 theme: {
                     current: 'Default (Dark) - By fsegurai',
@@ -67,10 +210,7 @@ export async function loadSettings() {
                     list: [...default_feature_presets]
                 }
             },
-            theme: {
-                base_colours: {
-                    dark: true,
-                },
+            syntax: {
                 accent_colours: {
                     accent01: 'rgb(86, 156, 214)',    // Headers, Bold
                     accent02: 'rgb(197, 134, 192)',   // Macro Wrapping(cycle 1), Links, Images
@@ -95,400 +235,81 @@ export async function loadSettings() {
                     bracket_matching: true,
                 }
             },
-            drawer_state: {
-                accents: true
+            copilot: {
+                inline: {
+                    enabled: false,
+                    api_type: 'llamacpp',
+                    base_url: 'http://127.0.0.1:8080',
+                    sequences: {
+                        prefix: '<|fim_prefix|>',
+                        suffix: '<|fim_suffix|>',
+                        middle: '<|fim_middle|>',
+                    },
+                    template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
+                    tc_preset: 'None',
+                    charCardEnabled: false,
+                    charFields: {
+                        description: true,
+                        personality: true,
+                        scenario: true,
+                        first_message: true,
+                        example_dialogue: true,
+                    }
+                }
             }
         };
     }
 
+    // Ensure all expected properties exist with defaults
+    const currentVersion = '0.1';
+    const storedVersion = extension_settings.promptmirror.metadata?.version;
+    if (!storedVersion || storedVersion < currentVersion) {
+        extension_settings.promptmirror = migrateSettings(extension_settings.promptmirror);
+    }
+
     saveSettingsDebounced();
 
-    $('#promptmirror_line_numbers').prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
+    // Features - Gutter
+    $('#promptmirror_line_numbers')         .prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
 
-    $('#promptmirror_dark_mode').prop('checked', extension_settings.promptmirror.theme.base_colours.dark);
 
-    $('#promptmirror_accent01').attr('color', extension_settings.promptmirror.theme.accent_colours.accent01);
-    $('#promptmirror_accent02').attr('color', extension_settings.promptmirror.theme.accent_colours.accent02);
-    $('#promptmirror_accent03').attr('color', extension_settings.promptmirror.theme.accent_colours.accent03);
-    $('#promptmirror_accent04').attr('color', extension_settings.promptmirror.theme.accent_colours.accent04);
-    $('#promptmirror_accent05').attr('color', extension_settings.promptmirror.theme.accent_colours.accent05);
-    $('#promptmirror_accent06').attr('color', extension_settings.promptmirror.theme.accent_colours.accent06);
-    $('#promptmirror_accent07').attr('color', extension_settings.promptmirror.theme.accent_colours.accent07);
-    $('#promptmirror_accent08').attr('color', extension_settings.promptmirror.theme.accent_colours.accent08);
-    $('#promptmirror_accent09').attr('color', extension_settings.promptmirror.theme.accent_colours.accent09);
-    $('#promptmirror_accent10').attr('color', extension_settings.promptmirror.theme.accent_colours.accent10);
+    // Features - Highlighting
+    $('#promptmirror_active_line')          .prop('checked', extension_settings.promptmirror.features.highlighting.active_line);
+    $('#promptmirror_draw_selection')       .prop('checked', extension_settings.promptmirror.features.highlighting.draw_selection);
+    $('#promptmirror_selection_matches')    .prop('checked', extension_settings.promptmirror.features.highlighting.selection_matches);
+    $('#promptmirror_bracket_matching')     .prop('checked', extension_settings.promptmirror.features.highlighting.bracket_matching);
 
+
+    // syntaxs - Accent Colours
+    $('#promptmirror_colour_accent01')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent01);
+    $('#promptmirror_colour_accent02')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent02);
+    $('#promptmirror_colour_accent03')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent03);
+    $('#promptmirror_colour_accent04')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent04);
+    $('#promptmirror_colour_accent05')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent05);
+    $('#promptmirror_colour_accent06')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent06);
+    $('#promptmirror_colour_accent07')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent07);
+    $('#promptmirror_colour_accent08')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent08);
+    $('#promptmirror_colour_accent09')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent09);
+    $('#promptmirror_colour_accent10')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent10);
+
+
+    // Presets //
+    //-----------
+    // Presets - Theme Presets
     populateThemePresetSelectionHTML();
 
-    $('#promptmirror_theme_preset').val(extension_settings.promptmirror.presets.theme.current);
+    $('#promptmirror_theme_preset')         .val(extension_settings.promptmirror.presets.theme.current);
 
+
+    // Presets - Feature Presets
     populateFeaturePresetSelectionHTML();
 
-    $('#promptmirror_feature_preset').val(extension_settings.promptmirror.presets.features.current);
-}
 
+    $('#promptmirror_feature_preset')       .val(extension_settings.promptmirror.presets.features.current);
 
-
-/**
- * Import a theme from a .json file.
- *
- * @param {Event} e - The change event triggered by the file input element
- * @returns {Promise<void>}
- */
-async function importTheme(e) {
-    if (!(e.target instanceof HTMLInputElement)) {
-        return;
-    }
-    const file = e.target.files[0];
-
-    if (!file) {
-        console.warn('[PM]No file selected.');
-        return;
-    }
-
-    const data = await parseJsonFile(file);
-    // check if it contains the required properties with no extra keys
-
-    const processedData = processThemeData(data);
-    if (!processedData) {
-        console.error('[PM]Invalid theme data.');
-        return;
-    }
-
-    // Add the processed theme data to the presets list
-    extension_settings.promptmirror.presets.theme.list.push(structuredClone(processedData));
-
-    // Save the settings and repopulate the preset selection HTML
-    saveSettingsDebounced();
-    populateThemePresetSelectionHTML();
-}
-
-/**
- * Export an existing theme preset to a .json file.
- *
- * @returns {Promise<void>}
- */
-async function exportTheme() {
-    const currentPreset = $('#promptmirror_theme_preset').val();
-    const data = extension_settings.promptmirror.presets.theme.list.find((preset) => preset.name === currentPreset);
-
-    if (!data) {
-        console.error('[PM]No theme data found for the current preset. Please write a bug report if you see this.');
-        return;
-    }
-
-    const shortDate = new Date().toISOString().split('T')[0];
-    download(JSON.stringify(data), `PM-Theme-${currentPreset}-${shortDate}.json`, 'application/json');
-
-}
-
-/**
- * Update an existing theme preset with the current theme settings.
- *
- * @returns {Promise<void>}
- */
-async function updateTheme() {
-    const currentPreset = $('#promptmirror_theme_preset').val();
-    const locked_defaults = default_theme_presets.map((preset) => preset.name);
-
-    if (locked_defaults.includes(currentPreset)) { // Prevent any changes to default themes
-        console.error('[PM]Cannot change a default theme preset.');
-        return;
-    }
-
-    const data = extension_settings.promptmirror.theme;
-
-    const list_idx = extension_settings.promptmirror.presets.theme.list.findIndex((preset) => preset.name === currentPreset);
-    extension_settings.promptmirror.presets.theme.list[list_idx].data = structuredClone(data);
-
-    saveSettingsDebounced();
-}
-
-/**
- * Update an existing feature preset with the current feature settings.
- *
- * @returns {Promise<void>}
- */
-async function updateFeature() {
-    const currentPreset = $('#promptmirror_feature_preset').val();
-    const locked_defaults = default_feature_presets.map((preset) => preset.name);
-
-    if (locked_defaults.includes(currentPreset)) { // Prevent any changes to default themes
-        console.error('[PM]Cannot change a default features preset.');
-        return;
-    }
-
-    const data = extension_settings.promptmirror.features;
-
-    const list_idx = extension_settings.promptmirror.presets.features.list.findIndex((preset) => preset.name === currentPreset);
-    extension_settings.promptmirror.presets.features.list[list_idx].data = structuredClone(data);
-
-    saveSettingsDebounced();
-}
-
-/**
- * Rename the current theme preset.
- *
- * @returns {Promise<void>}
- */
-async function renameTheme() {
-    const currentPreset = $('#promptmirror_theme_preset').val();
-    const locked_defaults = default_theme_presets.map((preset) => preset.name);
-
-    if (locked_defaults.includes(currentPreset)) { // Prevent any changes to default themes
-        console.error('[PM]Cannot change a default theme preset.');
-        return;
-    }
-
-    const newName = await Popup.show.input('Rename PromptMirror Theme Preset', 'Enter a new name for the preset.', currentPreset);
-
-    if (!newName) {
-        console.warn('[PM]No name provided.');
-        return;
-    }
-
-    const list_idx = extension_settings.promptmirror.presets.theme.list.findIndex((preset) => preset.name === currentPreset);
-
-    if (list_idx === -1) {
-        console.error('[PM]Preset not found. Please write a bug report if you see this.');
-        return;
-    }
-
-    extension_settings.promptmirror.presets.theme.list[list_idx].name = newName;
-    extension_settings.promptmirror.presets.theme.current = newName;
-    saveSettingsDebounced();
-    populateThemePresetSelectionHTML();
-}
-
-/**
- * Rename the current feature preset.
- *
- * @returns {Promise<void>}
- */
-async function renameFeature() {
-    const currentPreset = $('#promptmirror_feature_preset').val();
-    const locked_defaults = default_feature_presets.map((preset) => preset.name);
-
-    if (locked_defaults.includes(currentPreset)) { // Prevent any changes to default features
-        console.error('[PM]Cannot change a default features preset.');
-        return;
-    }
-
-    const newName = await Popup.show.input('Rename PromptMirror Feature Preset', 'Enter a new name for the preset.', currentPreset);
-
-    if (!newName) {
-        console.warn('[PM]No name provided.');
-        return;
-    }
-
-    const list_idx = extension_settings.promptmirror.presets.features.list.findIndex((preset) => preset.name === currentPreset);
-
-    if (list_idx === -1) {
-        console.error('[PM]Preset not found. Please write a bug report if you see this.');
-        return;
-    }
-
-    extension_settings.promptmirror.presets.features.list[list_idx].name = newName;
-    extension_settings.promptmirror.presets.features.current = newName;
-    saveSettingsDebounced();
-    populateFeaturePresetSelectionHTML();
-}
-
-/**
- * Create a new theme preset.
- *
- * @returns {void}
- */
-async function createTheme() {
-    const newName = await Popup.show.input('Create PromptMirror Theme Preset', 'Enter a name for the new preset.');
-
-    if (!newName) {
-        console.warn('[PM]No name provided.');
-        return;
-    }
-
-    // Check if a preset with the same name already exists
-    if (extension_settings.promptmirror.presets.theme.list.some((preset) => preset.name === newName)) {
-        console.error('[PM]A preset with the same name already exists.');
-        return;
-    }
-
-    const currentThemeData = extension_settings.promptmirror.theme;
-
-    const newPreset = {
-        version: '0.1',
-        name: newName,
-        // Deep clone the current theme data into the new preset
-        // to prevent any references to the original data
-        data: structuredClone(currentThemeData),
-    };
-
-    // Add the new preset and set it as the current
-    extension_settings.promptmirror.presets.theme.list.push(newPreset);
-    extension_settings.promptmirror.presets.theme.current = newName;
-
-    // Save the settings and repopulate the preset selection HTML
-    saveSettingsDebounced();
-    populateThemePresetSelectionHTML();
-}
-
-/**
- * Create a new feature preset.
- *
- * @returns {void}
- */
-async function createFeature() {
-    const newName = await Popup.show.input('Create PromptMirror Feature Preset', 'Enter a name for the new preset.');
-
-    if (!newName) {
-        console.warn('[PM]No name provided.');
-        return;
-    }
-
-    // Check if a preset with the same name already exists
-    if (extension_settings.promptmirror.presets.features.list.some((preset) => preset.name === newName)) {
-        console.error('[PM]A preset with the same name already exists.');
-        return;
-    }
-
-    const currentFeatureData = extension_settings.promptmirror.features;
-
-    const newPreset = {
-        version: '0.1',
-        name: newName,
-        // Deep clone the current feature data into the new preset
-        // to prevent any references to the original data
-        data: structuredClone(currentFeatureData),
-    };
-
-    // Add the new preset and set it as the current
-    extension_settings.promptmirror.presets.features.list.push(newPreset);
-    extension_settings.promptmirror.presets.features.current = newName;
-
-    // Save the settings and repopulate the preset selection HTML
-    saveSettingsDebounced();
-    populateFeaturePresetSelectionHTML();
-}
-
-/**
- * Reload the current theme preset.
- */
-async function reloadTheme() {
-    const currentPreset = $('#promptmirror_theme_preset').val();
-
-    // Grab the data property from the matching preset
-    const presetData = extension_settings.promptmirror.presets.theme.list.find((preset) => preset.name === currentPreset).data;
-
-    // Deep clone the preset data into the extension settings
-    // to prevent any references to the original data
-    extension_settings.promptmirror.theme = structuredClone(presetData);
-
-    // Save the settings and refresh the theme settings menu
-    saveSettingsDebounced();
-    refreshThemeSettings();
-}
-
-/**
- * Reload the current feature preset.
- */
-async function reloadFeature() {
-    const currentPreset = $('#promptmirror_feature_preset').val();
-
-    // Grab the data property from the matching preset
-    const presetData = extension_settings.promptmirror.presets.features.list.find((preset) => preset.name === currentPreset).data;
-
-    // Deep clone the preset data into the extension settings
-    // to prevent any references to the original data
-    extension_settings.promptmirror.features = structuredClone(presetData);
-
-
-    // Save the settings and refresh the feature settings menu
-    saveSettingsDebounced();
-    refreshFeatureSettings();
-}
-
-/**
- * Delete the current theme preset.
- *
- * @returns {Promise<void>}
- */
-async function deleteTheme() {
-    const currentPreset = $('#promptmirror_theme_preset').val();
-    const locked_defaults = default_theme_presets.map((preset) => preset.name);
-
-    if (locked_defaults.includes(currentPreset)) { // Prevent any changes to default themes
-        console.error('[PM]Cannot delete a default theme preset.');
-        return;
-    }
-
-    const list_idx = extension_settings.promptmirror.presets.theme.list.findIndex((preset) => preset.name === currentPreset);
-
-    if (list_idx === -1) {
-        console.error('[PM]Preset not found. Please write a bug report if you see this.');
-        return;
-    }
-
-    // Remove the preset from the list
-    extension_settings.promptmirror.presets.theme.list.splice(list_idx, 1);
-
-    // Apply the previous preset
-    extension_settings.promptmirror.presets.theme.current = extension_settings.promptmirror.presets.theme.list[list_idx - 1].name;
-    extension_settings.promptmirror.theme = structuredClone(extension_settings.promptmirror.presets.theme.list[list_idx - 1].data);
-
-    // Save the settings and repopulate the preset selection HTML
-    saveSettingsDebounced();
-    populateThemePresetSelectionHTML();
-}
-
-/**
- * Delete the current feature preset.
- *
- * @returns {Promise<void>}
- */
-async function deleteFeature() {
-    const currentPreset = $('#promptmirror_feature_preset').val();
-    const locked_defaults = default_feature_presets.map((preset) => preset.name);
-
-    if (locked_defaults.includes(currentPreset)) { // Prevent any changes to default themes
-        console.error('[PM]Cannot delete a default feature preset.');
-        return;
-    }
-
-    const list_idx = extension_settings.promptmirror.presets.features.list.findIndex((preset) => preset.name === currentPreset);
-
-    if (list_idx === -1) {
-        console.error('[PM]Preset not found. Please write a bug report if you see this.');
-        return;
-    }
-
-    // Remove the preset from the list
-    extension_settings.promptmirror.presets.features.list.splice(list_idx, 1);
-
-    // Apply the previous preset
-    extension_settings.promptmirror.presets.features.current = extension_settings.promptmirror.presets.features.list[list_idx - 1].name;
-    extension_settings.promptmirror.features = structuredClone(extension_settings.promptmirror.presets.features.list[list_idx - 1].data);
-
-    // Save the settings and repopulate the preset selection HTML
-    saveSettingsDebounced();
-    populateFeaturePresetSelectionHTML();
-}
-
-/**
- * Retrieve the names of all currently owned theme presets
- *
- * @returns {string[]} - An array of preset names
- */
-function getThemePresetNameList() {
-    return extension_settings.promptmirror.presets.theme.list.map((preset) => preset.name);
-}
-
-/**
- * Retrieve the names of all currently owned feature presets
- *
- * @returns {string[]} - An array of preset names
- */
-function getFeaturePresetNameList() {
-    return extension_settings.promptmirror.presets.features.list.map((preset) => preset.name);
+    // Inline Completions //
+    //----------------------
+    loadInlineSettings();
 }
 
 /**
@@ -529,49 +350,52 @@ function populateFeaturePresetSelectionHTML() {
  * Refresh the theme settings menu.
  */
 function refreshThemeSettings() {
-    $('#promptmirror_theme_preset').val(extension_settings.promptmirror.presets.theme.current);
+    $('#promptmirror_theme_preset')             .val(extension_settings.promptmirror.presets.theme.current);
 
-    $('#promptmirror_dark_mode').prop('checked', extension_settings.promptmirror.theme.base_colours.dark);
-
-    $('#promptmirror_accent01').attr('color', extension_settings.promptmirror.theme.accent_colours.accent01);
-    $('#promptmirror_accent02').attr('color', extension_settings.promptmirror.theme.accent_colours.accent02);
-    $('#promptmirror_accent03').attr('color', extension_settings.promptmirror.theme.accent_colours.accent03);
-    $('#promptmirror_accent04').attr('color', extension_settings.promptmirror.theme.accent_colours.accent04);
-    $('#promptmirror_accent05').attr('color', extension_settings.promptmirror.theme.accent_colours.accent05);
-    $('#promptmirror_accent06').attr('color', extension_settings.promptmirror.theme.accent_colours.accent06);
-    $('#promptmirror_accent07').attr('color', extension_settings.promptmirror.theme.accent_colours.accent07);
-    $('#promptmirror_accent08').attr('color', extension_settings.promptmirror.theme.accent_colours.accent08);
-    $('#promptmirror_accent09').attr('color', extension_settings.promptmirror.theme.accent_colours.accent09);
-    $('#promptmirror_accent10').attr('color', extension_settings.promptmirror.theme.accent_colours.accent10);
+    $('#promptmirror_colour_accent01')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent01);
+    $('#promptmirror_colour_accent02')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent02);
+    $('#promptmirror_colour_accent03')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent03);
+    $('#promptmirror_colour_accent04')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent04);
+    $('#promptmirror_colour_accent05')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent05);
+    $('#promptmirror_colour_accent06')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent06);
+    $('#promptmirror_colour_accent07')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent07);
+    $('#promptmirror_colour_accent08')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent08);
+    $('#promptmirror_colour_accent09')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent09);
+    $('#promptmirror_colour_accent10')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent10);
 }
 
 /**
  * Refresh the feature settings menu.
  */
 function refreshFeatureSettings() {
-    $('#promptmirror_feature_preset').val(extension_settings.promptmirror.presets.features.current);
+    $('#promptmirror_feature_preset')       .val(extension_settings.promptmirror.presets.features.current);
 
-    $('#promptmirror_line_numbers').prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
+    $('#promptmirror_line_numbers')         .prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
+
+    $('#promptmirror_active_line')          .prop('checked', extension_settings.promptmirror.features.highlighting.active_line);
+    $('#promptmirror_draw_selection')       .prop('checked', extension_settings.promptmirror.features.highlighting.draw_selection);
+    $('#promptmirror_selection_matches')    .prop('checked', extension_settings.promptmirror.features.highlighting.selection_matches);
+    $('#promptmirror_bracket_matching')     .prop('checked', extension_settings.promptmirror.features.highlighting.bracket_matching);
 }
 
 export function registerListeners() {
     // Emergency Debug Button
     $('#alpha_debug_button').on('click', () => {
         extension_settings.promptmirror = {
+            metadata: {
+                version: '0.1',
+            },
             presets: {
                 theme: {
                     current: 'Default (Dark) - By fsegurai',
-                    list: [...default_theme_presets],
+                    list: [...default_theme_presets]
                 },
                 features: {
                     current: 'PromptMirror Lite',
                     list: [...default_feature_presets]
                 }
             },
-            theme: {
-                base_colours: {
-                    dark: true,
-                },
+            syntax: {
                 accent_colours: {
                     accent01: 'rgb(86, 156, 214)',    // Headers, Bold
                     accent02: 'rgb(197, 134, 192)',   // Macro Wrapping(cycle 1), Links, Images
@@ -595,75 +419,117 @@ export function registerListeners() {
                     selection_matches: true,
                     bracket_matching: true,
                 }
+            },
+            copilot: {
+                inline: {
+                    enabled: false,
+                    api_type: 'llamacpp',
+                    base_url: 'http://127.0.0.1:8080',
+                    sequences: {
+                        prefix: '<|fim_prefix|>',
+                        suffix: '<|fim_suffix|>',
+                        middle: '<|fim_middle|>',
+                    },
+                    template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
+                    tc_preset: 'None',
+                    charCardEnabled: false,
+                    charFields: {
+                        description: true,
+                        personality: true,
+                        scenario: true,
+                        first_message: true,
+                        example_dialogue: true,
+                    }
+                }
             }
         };
 
         loadSettings();
     });
 
+
+    // Features - Gutter
     $('#promptmirror_line_numbers').on('click', () => {
         extension_settings.promptmirror.features.gutter.showLineNum = $('#promptmirror_line_numbers').prop('checked');
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_dark_mode').on('click', () => {
-        extension_settings.promptmirror.theme.base_colours.dark = $('#promptmirror_dark_mode').prop('checked');
+
+    // Features - Highlighting
+    $('#promptmirror_active_line').on('click', () => {
+        extension_settings.promptmirror.features.highlighting.active_line = $('#promptmirror_active_line').prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#promptmirror_draw_selection').on('click', () => {
+        extension_settings.promptmirror.features.highlighting.draw_selection = $('#promptmirror_draw_selection').prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#promptmirror_selection_matches').on('click', () => {
+        extension_settings.promptmirror.features.highlighting.selection_matches = $('#promptmirror_selection_matches').prop('checked');
+        saveSettingsDebounced();
+    });
+
+    $('#promptmirror_bracket_matching').on('click', () => {
+        extension_settings.promptmirror.features.highlighting.bracket_matching = $('#promptmirror_bracket_matching').prop('checked');
         saveSettingsDebounced();
     });
 
 
-    // Accent Colours
-    $('#promptmirror_accent01').on('change', (event) => {
+    // Themes - Accent Colours
+    $('#promptmirror_colour_accent01').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent01 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent02').on('change', (event) => {
+    $('#promptmirror_colour_accent02').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent02 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent03').on('change', (event) => {
+    $('#promptmirror_colour_accent03').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent03 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent04').on('change', (event) => {
+    $('#promptmirror_colour_accent04').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent04 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent05').on('change', (event) => {
+    $('#promptmirror_colour_accent05').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent05 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent06').on('change', (event) => {
+    $('#promptmirror_colour_accent06').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent06 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent07').on('change', (event) => {
+    $('#promptmirror_colour_accent07').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent07 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent08').on('change', (event) => {
+    $('#promptmirror_colour_accent08').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent08 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent09').on('change', (event) => {
+    $('#promptmirror_colour_accent09').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent09 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
-    $('#promptmirror_accent10').on('change', (event) => {
+    $('#promptmirror_colour_accent10').on('change', (event) => {
         extension_settings.promptmirror.theme.accent_colours.accent10 = event.detail.rgba;
         saveSettingsDebounced();
     });
 
 
+    // Presets - Theme
     $('#promptmirror_theme_preset').on('change', () => {
         const selectedPreset = $('#promptmirror_theme_preset').val(),
         presetData = extension_settings.promptmirror.presets.theme.list.find((preset) => preset.name === selectedPreset).data;
@@ -680,13 +546,13 @@ export function registerListeners() {
         refreshThemeSettings();
     });
 
-    $('#promptmirror_theme_import').on('click', () => {
-        $('#promptmirror_theme_import_file').trigger('click');
-    });
+    // $('#promptmirror_theme_import').on('click', () => {
+    //     $('#promptmirror_theme_import_file').trigger('click');
+    // });
 
-    $('#promptmirror_theme_import_file').on('change', importTheme);
+    // $('#promptmirror_theme_import_file').on('change', importTheme);
 
-    $('#promptmirror_theme_export').on('click', exportTheme);
+    // $('#promptmirror_theme_export').on('click', exportTheme);
 
     $('#promptmirror_theme_update').on('click', updateTheme);
 
@@ -700,7 +566,7 @@ export function registerListeners() {
 
 
 
-    // Feature Settings
+    // Presets - Features
     $('#promptmirror_feature_preset').on('change', () => {
         const selectedPreset = $('#promptmirror_feature_preset').val();
         const presetData = extension_settings.promptmirror.presets.features.list.find((preset) => preset.name === selectedPreset).data;
@@ -734,43 +600,12 @@ export function registerListeners() {
     $('#promptmirror_feature_reload').on('click', reloadFeature);
 
     $('#promptmirror_feature_delete').on('click', deleteFeature);
+
+    // Inline Completions //
+    //----------------------
+    initInlineSettingListeners();
 }
 
 
 
-/**
- * Process the theme data to ensure it is valid and doesn't contain any extra keys
- *
- * @param {Object} themeData - The theme data to be processed
- * @returns {Object|void} - The processed theme data
- */
-function processThemeData(themeData) {
-    const main_keys = ["version", "name", "data"],
-    data_keys = ["base_colours", "accent_colours"],
-    base_colour_keys = ["dark"],
-    accent_colour_keys = ["accent01", "accent02", "accent03", "accent04", "accent05", "accent06", "accent07", "accent08", "accent09", "accent10"];
-
-    if (!themeData || typeof themeData !== 'object') {
-        return;
-    }
-
-    // check if the main keys are present
-    const main_keys_present = Object.keys(themeData).every((key) => main_keys.includes(key));
-    if (!main_keys_present) {
-        console.error('[PM]Theme data is missing required keys.');
-        return;
-    }
-
-    // filter out extra data keys
-    themeData.data = Object.fromEntries(Object.entries(themeData.data).filter(([key]) => data_keys.includes(key)));
-
-    // filter out extra base_colour keys
-    themeData.data.base_colours = Object.fromEntries(Object.entries(themeData.data.base_colours).filter(([key]) => base_colour_keys.includes(key)));
-
-    // filter out extra accent_colour keys
-    themeData.data.accent_colours = Object.fromEntries(Object.entries(themeData.data.accent_colours).filter(([key]) => accent_colour_keys.includes(key)));
-
-    return themeData;
-}
-
-
+export { populateThemePresetSelectionHTML, populateFeaturePresetSelectionHTML, refreshThemeSettings, refreshFeatureSettings, default_theme_presets, default_feature_presets };

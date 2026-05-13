@@ -70,32 +70,32 @@ function applyMergeRevertStyles(styles) {
     styleEl.id = 'cm-merge-revert-styles';
     // Define CSS with the theme-specific values
     styleEl.textContent = `
-    .cm-merge-revert {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
-        padding: 4px;
-        background-color: ${styles.backgroundColor};
-        border-left: 1px solid ${styles.borderColor};
-        border-right: 1px solid ${styles.borderColor};
-        width: 32px;
-    }
+        .cm-merge-revert {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 4px;
+            background-color: ${styles.backgroundColor};
+            border-left: 1px solid ${styles.borderColor};
+            border-right: 1px solid ${styles.borderColor};
+            width: 32px;
+        }
 
-    .cm-merge-revert button {
-        width: 100%;
-        height: auto;
-        background-color: transparent;
-        border: none;
-        color: ${styles.buttonColor};
-        cursor: pointer;
-        margin: 0 auto;
-        font-size: 20px;
-    }
+        .cm-merge-revert button {
+            width: 100%;
+            height: auto;
+            background-color: transparent;
+            border: none;
+            color: ${styles.buttonColor};
+            cursor: pointer;
+            margin: 0 auto;
+            font-size: 20px;
+        }
 
-    .cm-merge-revert button:hover {
-        background-color: ${styles.buttonHoverColor};
-    }
+        .cm-merge-revert button:hover {
+            background-color: ${styles.buttonHoverColor};
+        }
     `;
     // Remove any existing merge styles
     const existingStyle = document.getElementById('cm-merge-revert-styles');
@@ -104,7 +104,6 @@ function applyMergeRevertStyles(styles) {
     // Add the new styles
     document.head.appendChild(styleEl);
 }
-
 
 /**
  *
@@ -155,26 +154,26 @@ function applyMergeRevertStyles(styles) {
 function grabColourConfigs() {
     const colourBase = {
         base_colours:{
-            background_primary: '#ffffff',
-            background_secondary: '#f3f3f3',
-            foreground_primary: '#383a42',
-            foreground_secondary: '#1f1f1f',
-            gutter: '#f5f5f5',
-            selection: '#d6d6d6',
-            invisables: '#6b6b6b',
-            cursor: '#000000',
+            background_primary: '#1e1e1e',
+            background_secondary: '#252526',
+            foreground_primary: '#d4d4d4',
+            foreground_secondary: '#e9e9e9',
+            gutter: '#1c1c1c',
+            selection: '#2d2d30',
+            invisables: '#838383',
+            cursor: '#c6c6c6',
         },
         accent_colours: {
-            accent01: extension_settings.promptmirror.theme.accent_colours.accent01,
-            accent02: extension_settings.promptmirror.theme.accent_colours.accent02,
-            accent03: extension_settings.promptmirror.theme.accent_colours.accent03,
-            accent04: extension_settings.promptmirror.theme.accent_colours.accent04,
-            accent05: extension_settings.promptmirror.theme.accent_colours.accent05,
-            accent06: extension_settings.promptmirror.theme.accent_colours.accent06,
-            accent07: extension_settings.promptmirror.theme.accent_colours.accent07,
-            accent08: extension_settings.promptmirror.theme.accent_colours.accent08,
-            accent09: extension_settings.promptmirror.theme.accent_colours.accent09,
-            accent10: extension_settings.promptmirror.theme.accent_colours.accent10,
+            accent01: extension_settings.promptmirror.syntax.accent_colours.accent01,
+            accent02: extension_settings.promptmirror.syntax.accent_colours.accent02,
+            accent03: extension_settings.promptmirror.syntax.accent_colours.accent03,
+            accent04: extension_settings.promptmirror.syntax.accent_colours.accent04,
+            accent05: extension_settings.promptmirror.syntax.accent_colours.accent05,
+            accent06: extension_settings.promptmirror.syntax.accent_colours.accent06,
+            accent07: extension_settings.promptmirror.syntax.accent_colours.accent07,
+            accent08: extension_settings.promptmirror.syntax.accent_colours.accent08,
+            accent09: extension_settings.promptmirror.syntax.accent_colours.accent09,
+            accent10: extension_settings.promptmirror.syntax.accent_colours.accent10,
         }
     };
 
@@ -190,23 +189,23 @@ function uiColourConfigs(colourBase) {
     return Object.assign(colourBase, {
         ui_colours: {
             invalid: colourBase.accent_colours.accent07,
-            highlightBackground: '#99999926',
+            highlightBackground: '#ffffff08',
             background: colourBase.base_colours.background_primary,
             tooltipBackground: colourBase.base_colours.background_secondary,
-            selection: '#add6ff',
-            selectionMatch: '#a8ac9480',
+            selection: '#264F7899',
+            selectionMatch: '#72a1ff59',
             cursor: colourBase.base_colours.cursor,
-            activeBracketBg: '#007acc20',
+            activeBracketBg: '#ffffff15',
             activeBracketBorder: colourBase.accent_colours.accent01,
             diagnosticWarning: colourBase.accent_colours.accent10,
             linkColor: colourBase.accent_colours.accent03,
             visitedLinkColor: colourBase.accent_colours.accent02,
         },
         diff_colours: {
-            addedBackground: '#ddfbe0',
-            removedBackground: '#ffebec',
-            addedText: '#22863a',
-            removedText: '#e51400',
+            addedBackground: '#1e3f1e80',
+            removedBackground: '#4b1c1c80',
+            addedText: '#6cc26f',
+            removedText: '#f14c4c',
         }
     });
 }
@@ -214,7 +213,7 @@ function uiColourConfigs(colourBase) {
 export function packTheme() {
     const themeColours = grabColourConfigs();
 
-    const vsCodeLightTheme = /*@__PURE__*/EditorView.theme({
+    const vsCodeDarkTheme = /*@__PURE__*/EditorView.theme({
         // Base editor styles
         '&': {
             color: themeColours.base_colours.foreground_primary,
@@ -233,7 +232,7 @@ export function packTheme() {
         },
         '.cm-fat-cursor': {
             backgroundColor: `${themeColours.ui_colours.cursor}`,
-            color: themeColours.ui_colours.background,
+            color: themeColours.base_colours.background_primary,
         },
         // Selection
         '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
@@ -245,13 +244,13 @@ export function packTheme() {
         },
         // Search functionality
         '.cm-searchMatch': {
-            backgroundColor: '#bbdefb',
-            outline: `1px solid ${themeColours.accent_colours.accent03}`,
+            backgroundColor: '#72a1ff40',
+            outline: `1px solid ${themeColours.ui_colours.diagnosticWarning}`,
             color: themeColours.base_colours.foreground_secondary,
             borderRadius: generalSearchField.borderRadius,
         },
         '.cm-searchMatch.cm-searchMatch-selected': {
-            backgroundColor: '#90caf9',
+            backgroundColor: '#3794ff90',
             color: themeColours.base_colours.foreground_secondary,
             padding: generalSearchField.padding,
             '& span': {
@@ -268,7 +267,7 @@ export function packTheme() {
             backgroundColor: themeColours.base_colours.background_secondary,
             color: themeColours.base_colours.foreground_primary,
             borderRadius: '3px',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.45)',
         },
         '.cm-panels.cm-panels-top': {
             borderBottom: `1px solid ${themeColours.base_colours.selection}`,
@@ -277,14 +276,14 @@ export function packTheme() {
             borderTop: `1px solid ${themeColours.base_colours.selection}`,
         },
         '.cm-panel button': {
-            backgroundColor: themeColours.ui_colours.background,
+            backgroundColor: themeColours.base_colours.selection,
             color: themeColours.base_colours.foreground_primary,
             border: `1px solid ${themeColours.base_colours.selection}`,
             borderRadius: generalPanel.borderRadius,
             padding: generalPanel.padding,
         },
         '.cm-panel button:hover': {
-            backgroundColor: '#e8e8e8',
+            backgroundColor: '#3a3a3a',
             border: `1px solid ${themeColours.base_colours.invisables}`,
         },
         // Line highlighting
@@ -296,14 +295,14 @@ export function packTheme() {
         // Gutters
         '.cm-gutters': {
             backgroundColor: themeColours.base_colours.gutter,
-            color: '#237893', // VSCode's specific gutter color
+            color: themeColours.base_colours.invisables,
             border: 'none',
             borderRight: `1px solid ${themeColours.base_colours.selection}`,
             paddingRight: generalGutter.paddingRight,
         },
         '.cm-activeLineGutter': {
             backgroundColor: themeColours.ui_colours.highlightBackground,
-            color: '#0b216f', // VSCode's specific active gutter color
+            color: themeColours.base_colours.foreground_secondary,
             fontWeight: generalGutter.fontWeight,
         },
         '.cm-lineNumbers': {
@@ -315,11 +314,11 @@ export function packTheme() {
             lineHeight: generalGutter.lineHeight,
         },
         '.cm-foldGutter .cm-gutterElement': {
-            color: '#237893',
+            color: themeColours.base_colours.invisables,
             cursor: 'pointer',
         },
         '.cm-foldGutter .cm-gutterElement:hover': {
-            color: '#0b216f',
+            color: themeColours.base_colours.foreground_secondary,
         },
         // Diff/Merge View Styles
         // Inserted/Added Content
@@ -366,24 +365,24 @@ export function packTheme() {
             border: `1px solid ${themeColours.base_colours.selection}`,
             borderRadius: generalTooltip.borderRadius,
             padding: generalTooltip.padding,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 3px 8px rgba(0, 0, 0, 0.3)',
         },
         '.cm-tooltip-autocomplete': {
             '& > ul': {
                 backgroundColor: themeColours.ui_colours.tooltipBackground,
-                border: 'none',
-                maxHeight: '300px',
+                border: `none`,
+                maxHeight: `300px`,
             },
             '& > ul > li': {
                 padding: generalTooltip.padding,
                 lineHeight: generalTooltip.lineHeight,
             },
             '& > ul > li[aria-selected]': {
-                backgroundColor: '#dcebfc',
+                backgroundColor: '#04395e',
                 color: themeColours.base_colours.foreground_secondary,
                 borderRadius: generalTooltip.borderRadiusSelected,
             },
-            '& > ul > li > span.cm-completionIcon': {
+            '& > ul > li > span.cm-completionLabel': {
                 color: themeColours.base_colours.invisables,
                 paddingRight: generalTooltip.paddingRight,
             },
@@ -425,7 +424,7 @@ export function packTheme() {
             borderRadius: generalMatching.borderRadius,
         },
         '.cm-nonmatchingBracket': {
-            backgroundColor: `${themeColours.accent_colours.accent07}`,
+            backgroundColor: `${themeColours.base_colours.accent07}`,
             outline: `1px solid ${themeColours.ui_colours.invalid}`,
             borderRadius: generalMatching.borderRadius,
         },
@@ -458,23 +457,21 @@ export function packTheme() {
             background: themeColours.ui_colours.background,
         },
         '& .cm-scroller::-webkit-scrollbar-thumb': {
-            backgroundColor: '#dadada',
+            backgroundColor: '#424242',
             borderRadius: generalScroller.borderRadius,
-            border: `3px solid ${themeColours.ui_colours.background}`,
+            border: `1px solid ${themeColours.ui_colours.background}`,
         },
         '& .cm-scroller::-webkit-scrollbar-thumb:hover': {
-            backgroundColor: '#cccccc',
+            backgroundColor: '#525252',
         },
         // Ghost text
         '.cm-ghostText': {
             opacity: '0.5',
             color: themeColours.base_colours.invisables,
         },
-    }, { dark: false });
-    /**
-     * Enhanced syntax highlighting for VSCode Light theme
-     */
-    const vsCodeLightHighlightStyle = /*@__PURE__*/HighlightStyle.define([
+    }, {dark: true});
+
+    const vsCodeDarkHighlightStyle = /*@__PURE__*/HighlightStyle.define([
         // Keywords and control flow
         { tag: tags.keyword, color: themeColours.accent_colours.accent01, fontWeight: 'bold' },
         { tag: tags.controlKeyword, color: themeColours.accent_colours.accent02, fontWeight: 'bold' },
@@ -509,9 +506,9 @@ export function packTheme() {
         },
         { tag: [tags.atom, tags.bool, /*@__PURE__*/tags.special(tags.variableName)], color: themeColours.accent_colours.accent01 },
         // Strings and regex
-        { tag: [tags.processingInstruction, tags.inserted], color: themeColours.accent_colours.accent05 },
-        { tag: [/*@__PURE__*/tags.special(tags.string), tags.regexp], color: themeColours.accent_colours.accent02 },
-        { tag: tags.string, color: themeColours.accent_colours.accent05 },
+        { tag: [tags.processingInstruction, tags.inserted], color: themeColours.accent_colours.accent06 },
+        { tag: [/*@__PURE__*/tags.special(tags.string), tags.regexp], color: '#d16969' },
+        { tag: tags.string, color: themeColours.accent_colours.accent06 },
         // Punctuation and structure
         { tag: /*@__PURE__*/tags.definition(tags.typeName), color: themeColours.accent_colours.accent04, fontWeight: 'bold' },
         { tag: [/*@__PURE__*/tags.definition(tags.name), tags.separator], color: themeColours.base_colours.foreground_primary },
@@ -531,7 +528,7 @@ export function packTheme() {
         { tag: tags.heading5, color: themeColours.accent_colours.accent01 },
         { tag: tags.heading6, color: themeColours.accent_colours.accent01 },
         { tag: [tags.strong], fontWeight: 'bold', color: themeColours.accent_colours.accent01 },
-        { tag: [tags.emphasis], fontStyle: 'italic', color: themeColours.accent_colours.accent03 },
+        { tag: [tags.emphasis], fontStyle: 'italic', color: themeColours.accent_colours.accent04 },
         // Links and URLs
         {
             tag: [tags.link],
@@ -560,5 +557,5 @@ export function packTheme() {
         { tag: tags.quote, color: themeColours.accent_colours.accent08 },
     ]);
 
-    return [vsCodeLightTheme,/*@__PURE__*/syntaxHighlighting(vsCodeLightHighlightStyle)];
+    return [vsCodeDarkTheme, /*@__PURE__*/syntaxHighlighting(vsCodeDarkHighlightStyle)]
 }
