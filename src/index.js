@@ -22,10 +22,22 @@ const { isMobile, TextCompletionService } = SillyTavern.getContext();
 
 
 jQuery(async () => {
-    const settingsHtml = await $.get(`${extensionPath}/settings/settings.html`);
+    const settingsHtml = await $.get(`${extensionPath}/settings/ui/settings.html`);
+
+    const
+    presetsHtml = await $.get(`${extensionPath}/settings/ui/drawers/presets.html`),
+    syntaxHtml = await $.get(`${extensionPath}/settings/ui/drawers/syntax.html`),
+    featuresHtml = await $.get(`${extensionPath}/settings/ui/drawers/features.html`),
+    copilotHtml = await $.get(`${extensionPath}/settings/ui/drawers/copilot.html`);
+
     $('#extensions_settings').append(settingsHtml);
 
-    const settingsCss = await $.get(`${extensionPath}/settings/settings.css`);
+    $('#promptmirror_settings').append(presetsHtml);
+    $('#promptmirror_settings').append(syntaxHtml);
+    $('#promptmirror_settings').append(featuresHtml);
+    $('#promptmirror_settings').append(copilotHtml);
+
+    const settingsCss = await $.get(`${extensionPath}/settings/ui/settings.css`);
     $('<style>').text(settingsCss).appendTo('head');
 
     registerListeners();

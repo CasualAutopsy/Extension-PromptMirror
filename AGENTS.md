@@ -1,234 +1,133 @@
-# PromptMirror Extension
+# PromptMirror Extension — Agent Guide
 
-SillyTavern browser extension that replaces standard textareas with a CodeMirror-powered rich text editor. Supports syntax highlighting for Markdown, custom Handlebar macro highlighting, theme presets, feature presets, and inline AI completions.
+## Before You Start
+
+Load these skills first — they contain project-specific patterns and best practices:
+
+- **`javascript-pro`** — Modern JS patterns, ES6+, async/await, browser/Node compatibility
+- **`nodejs-best-practices`** — Node.js conventions, async patterns, security
+
+## What This Is
+
+A SillyTavern browser extension that replaces expanded text areas with a full CodeMirror 6 editor. Provides syntax highlighting (Markdown, JSON, YAML, XML, CSS), custom Handlebar macro highlighting, theme presets, feature presets, and AI-powered inline completion (FIM).
 
 ## Commands
 
 ```bash
-npm install        # Install dependencies
-npm run build      # Build minified bundle → dist/index.js
+npm install          # Install dependencies
+npm run build        # Production build → dist/index.js
 ```
 
-No test suite exists. Build is the only workflow command.
+No test framework. No lint config beyond what LSP reports.
 
 ## Architecture
 
+### Entry Point: `src/index.js`
+
+1. Loads settings HTML/CSS into SillyTavern's settings panel via jQuery
+2. Registers a `MutationObserver` on `document.body` watching for new `<dialog>` elements
+3. When a dialog contains `textarea.maximized_textarea`, calls `setupCodeMirror(target)`
+4. `setupCodeMirror()` creates a CodeMirror editor, hides the original textarea, and syncs edits back via `EditorView.updateListener`
+
+### Key Runtime Globals (loaded via dynamic `import(/* webpackIgnore: true */ ...)`):
+
+| Global | Source | Used For |
+|---|---|---|
+| `SillyTavern.getContext()` | SillyTavern runtime | `isMobile`, `TextCompletionService`, `extension_settings` |
+| `extension_settings` | `/scripts/extensions.js` | All extension config state |
+| `saveSettingsDebounced()` | `/script.js` | Persist settings to localStorage |
+| `$` (jQuery) | SillyTavern runtime | DOM manipulation, settings HTML loading |
+
+**Critical**: These are NOT bundled — they're injected by SillyTavern at runtime. The `/* webpackIgnore: true */` directive tells webpack not to bundle them, and they're accessed via dynamic `import()` which returns a module namespace.
+
+### Settings System (`src/settings/settings.js`)
+
+- `DEFAULT_SETTINGS` is the canonical schema — used by `loadSettings()`, `migrateSettings()`, and the debug reset button
+- `migrateSettings()` uses nullish coalescing to backfill missing keys — **always update this when adding new settings**
+- Settings live in `extension_settings.promptmirror` (namespace is `Extension-PromptMirror`)
+- `saveSettingsDebounced()` is called after every setting change — don't batch manually
+
+### Presets System (`src/settings/presets.js`)
+
+- Two preset categories: **themes** (colors) and **features** (editor behavior toggles)
+- Default presets are locked — `updateTheme()`/`updateFeature()` check against `default_theme_presets` / `default_feature_presets` before allowing edits
+- Import/export as JSON files using SillyTavern's `parseJsonFile()` and `download()` utilities
+
+### Copilot / Inline Completion (`src/copilot/inline/`)
+
+- Uses `@marimo-team/codemirror-ai`'s `inlineCompletion()` extension
+- **Two modes**:
+  - `sillyInlineCompletion()` — FIM prompt with prefix/suffix from cursor position
+  - `charCardInlineCompletion(field)` — builds context from all character card fields, active field gets cursor position
+- FIM template: `{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}`
+- Sends request via SillyTavern's `TextCompletionService` (supports multiple API backends via `api_type`)
+- Inline completion UI binding & listeners moved to `src/settings/scripts/inline.js`
+
+### Copilot Rewrite (`src/copilot/rewrite/`)
+
+- New directory for rewrite-related copilot functionality (structure TBD)
+
+### Syntax Highlighting
+
+- **Handlebar macros** (`src/syntax/handlebars.js`): Custom Lezer inline parser for `{{...}}` syntax with nested depth tracking (3 depth levels, each with different highlight style)
+- **Code block languages** (`src/syntax/codeblocks.js`): Maps markdown code blocks to CodeMirror language modes (Markdown, JSON, YAML, XML)
+- **Theme** (`src/themes/fsegurai.js`): Generates CodeMirror `HighlightStyle` from accent color settings; dynamically injects merge-revert CSS
+
+### Code Organization
+
 ```
 src/
-├── index.js              # Entry point – MutationObserver watches for textarea dialogs, calls setupCodeMirror()
-├── style.css             # Host container styling (CSS variables from SillyTavern theming)
-├── syntax/
-│   ├── codeblocks.js     # Dynamic language loaders for Markdown/JSON/YAML/XML code blocks
-│   └── handlebars.js     # Lezer inline parser for {{handlebar}} macros with nested depth color cycling
+├── index.js                    # Entry point, MutationObserver, setupCodeMirror()
+├── style.css                   # Extension container styles (SillyTavern theme vars)
 ├── settings/
-│   ├── settings.js       # Loads extension_settings.promptmirror into UI controls, registers listeners
-│   ├── settings.html     # Inline-drawer UI for presets, colours, features, copilot
-│   ├── presets.js        # CRUD for theme/feature presets (import/export/rename/delete/create/update/reload)
-│   └── versioning.js     # Migrates old settings to current format, updates default presets
-├── themes/
-│   └── fsegurai.js       # Theme builder – maps accent01-10 to Lezer tags, generates HighlightStyle
-└── copilot/
-    └── inline/
-        ├── inline.js     # FIM (Fill-in-the-Middle) inline completion via @marimo-team/codemirror-ai
-        └── settings.js   # Copilot API/source/sequence settings listeners
+│   ├── settings.js             # DEFAULT_SETTINGS, migrateSettings(), loadSettings()
+│   ├── presets.js              # Theme/feature preset CRUD (import, export, rename, delete)
+│   ├── scripts/
+│   │   └── inline.js           # Inline completion UI binding & listeners
+│   └── ui/
+│       ├── settings.html       # Settings UI template
+│       ├── settings.css        # Settings panel styles
+│       └── drawers/
+│           ├── copilot.html    # Copilot settings drawer
+│           ├── features.html   # Feature settings drawer
+│           ├── presets.html    # Preset settings drawer
+│           └── syntax.html     # Syntax settings drawer
+├── copilot/
+│   ├── inline/
+│   │   └── inline.js           # sillyInlineCompletion(), charCardInlineCompletion()
+│   └── rewrite/                # Rewrite-related copilot functionality (TBD)
+├── syntax/
+│   ├── handlebars.js           # Lezer inline parser for {{...}} macros
+│   └── codeblocks.js           # Code block language mappings
+└── themes/
+    ├── LICENSE
+    └── fsegurai.js             # CodeMirror theme generation from settings
 ```
 
-## Key patterns and gotchas
+## Conventions & Gotchas
 
-**Webpack externals via `/* webpackIgnore: true */`**
-SillyTavern globals (`extension_settings`, `SillyTavern`, `Popup`, `TextCompletionService`, etc.) are imported at runtime from the host page, not bundled. All such imports use the webpackIgnore comment pattern:
-```js
-const { extension_settings } = await import(/* webpackIgnore: true */ '/scripts/extensions.js');
-```
-Any new dependency on SillyTavern APIs must follow this pattern.
+1. **`// @ts-nocheck` everywhere** — TypeScript is a dev dependency but not enforced. All source files are plain JS.
+2. **Webpack config is minimal** — no TypeScript loader, no source maps, just JS + CSS bundling with Terser minification.
+3. **Output goes to `dist/index.js`** — this is what `manifest.json` references. Always rebuild after changes.
+4. **Settings migration is manual** — adding a new setting requires updating `DEFAULT_SETTINGS`, `migrateSettings()`, and the UI binding in the same change.
+5. **`extensionPath` is hardcoded** as `scripts/extensions/third-party/Extension-PromptMirror/src` — changing the folder name breaks this.
+6. **CSS uses SillyTavern CSS custom properties** (`--SmartThemeBodyColor`, `--SmartThemeBorderColor`, etc.) — don't hardcode colors in `style.css`.
+7. **The `setupCodeMirror` function is called multiple times** — once per textarea that gets expanded. It creates a new editor each time; there's no cleanup/dispose logic.
+8. **`charCardInlineCompletion` has debug `console.log` statements** (in `src/copilot/inline/inline.js`) — remove before committing.
+9. **`codeblocks.js` async functions** — LSP warns these could be async but aren't. The `load()` callbacks return Promises from dynamic `import()`, which is correct.
+10. **No build tests** — verify by loading the extension in SillyTavern after `npm run build`.
 
-**Settings live in the host page**
-`extension_settings.promptmirror` is stored and persisted by SillyTavern's own settings system. Use `saveSettingsDebounced()` from `SillyTavern.getContext()` to persist changes. The extension reads/writes this object but never manages its own storage.
+## Adding a New Setting
 
-**Recommended initialization pattern**
-- Use `activate` hook for synchronous setup during SillyTavern's loading phase
-- Use `APP_INITIALIZED` event for setup after all extensions load but while loader is visible
-- Use `APP_READY` event for asynchronous setup that doesn't block usability
-See: [UI Extensions – Best practices for extension initialization](https://docs.sillytavern.app/for_contributors/writing-extensions.md#best-practices-for-extension-initialization)
+1. Add to `DEFAULT_SETTINGS` (the nested object)
+2. Add type check + default in `migrateSettings()`
+3. Add UI binding in the relevant `settings.js`, `settings/scripts/inline.js`, or `settings/ui/drawers/`
+4. Add to `setupCodeMirror()` if it affects editor behavior
+5. Rebuild: `npm run build`
 
-**MutationObserver for lazy initialization**
-`setupCodeMirror()` is triggered by observing `document.body` for newly added `<dialog>` elements containing `textarea.maximized_textarea`. This means the editor is only instantiated when the user opens the expand dialog — not on page load.
+## Adding a New Syntax Highlight
 
-**Handlebar parser uses Lezer inline parser**
-Custom syntax highlighting for `{{handlebar}}` macros is implemented as a Lezer `parseInline` config in `src/syntax/handlebars.js`. It handles nested `{{{{depth}}}}` with a 3-cycle color scheme. Adding new macro syntax requires modifying this parser.
-
-**Themes use dynamic style injection**
-`fsegurai.js` builds a CodeMirror `HighlightStyle` from the `extension_settings.promptmirror.theme` object and injects CSS for merge-revert buttons via `<style>` element creation. Theme changes don't require a rebuild — they apply immediately from the settings object.
-
-**CSS variables tie to SillyTavern's SmartTheme system**
-`style.css` uses `--SmartThemeBodyColor`, `--SmartThemeBorderColor`, `--SmartThemeBlurTintColor`, `--black30a`. These are provided by SillyTavern's `:root` CSS variables in `public/style.css` and are defined by the user's active theme. Do not hardcode colors in this file.
-
-Key SmartTheme variables:
-- `--SmartThemeBodyColor`: Primary text/background color (default: `rgb(220, 220, 210)`)
-- `--SmartThemeBorderColor`: Border color (default: `rgba(0, 0, 0, 0.5)`)
-- `--SmartThemeBlurTintColor`: Blurred background tint (default: `rgba(23, 23, 23, 1)`)
-- `--black30a`: Semi-transparent black (default: `rgba(0, 0, 0, 0.3)`)
-
-**Copilot (inline completions) is WIP**
-The copilot feature is gated behind a disabled toggle in the UI and has hardcoded defaults (`llamacpp`, `http://127.0.0.1:8080`). The `sillyInlineCompletion()` function is exported but commented out in `index.js:93-94`.
-
-**Settings HTML uses inline-drawer pattern**
-The settings panel follows SillyTavern's `inline-drawer` CSS class convention. New settings sections should wrap in the same pattern: `.inline-drawer` → `.inline-drawer-header` → `.inline-drawer-content`.
-
-HTML template rendering uses `renderExtensionTemplateAsync()`:
-```js
-const { renderExtensionTemplateAsync } = SillyTavern.getContext();
-const settingsHtml = await renderExtensionTemplateAsync(
-    'third-party/Extension-PromptMirror',
-    'settings',
-    { title: 'PromptMirror', version: '1.6.0' }
-);
-$('#extensions_settings2').append(settingsHtml);
-```
-
-**`// @ts-nocheck` everywhere**
-All JS files suppress TypeScript checks. This is intentional — the project doesn't have TypeScript configured.
-
-**File path convention**
-`extensionPath` is hardcoded as `scripts/extensions/third-party/Extension-PromptMirror/src` in `settings.js:22`. If you rename the extension folder, update this value.
-
-## SillyTavern API references
-
-### Accessing SillyTavern context
-```js
-const context = SillyTavern.getContext();
-const {
-    extensionSettings,      // Settings object for extensions
-    saveSettingsDebounced,  // Persist settings to server
-    eventSource,            // Event emitter
-    event_types,            // Event type constants
-    Popup,                  // Popup/dialog helpers
-    loader,                 // Action loader overlay
-    macros,                 // Macro registry
-    messageFormatter,       // Message formatting hooks
-    writeExtensionField,    // Write to character card extensions
-    getPresetManager,       // Preset manager for API types
-    renderExtensionTemplateAsync, // Handlebars template renderer
-    generateQuietPrompt,    // Background text generation
-    generateRaw,            // Raw text generation
-} = SillyTavern.getContext();
-```
-
-### Shared libraries available via `SillyTavern.libs`
-```js
-const { lodash, DOMPurify, Handlebars, localforage, yaml, Fuse } = SillyTavern.libs;
-```
-Full list: [UI Extensions – Shared libraries](https://docs.sillytavern.app/for_contributors/writing-extensions.md#shared-libraries)
-
-### Event types
-```js
-// App lifecycle
-event_types.APP_INITIALIZED   // App initialized, loader still visible
-event_types.APP_READY        // App fully loaded and ready
-
-// Messages
-event_types.MESSAGE_SENT
-event_types.MESSAGE_RECEIVED
-event_types.USER_MESSAGE_RENDERED
-event_types.CHARACTER_MESSAGE_RENDERED
-event_types.MESSAGE_EDITED
-event_types.MESSAGE_DELETED
-
-// Generation
-event_types.GENERATION_STARTED
-event_types.GENERATION_STOPPED
-event_types.GENERATION_ENDED
-
-// Chat
-event_types.CHAT_CHANGED
-event_types.CHAT_CREATED
-event_types.CHAT_DELETED
-
-// Settings and presets
-event_types.SETTINGS_UPDATED
-event_types.PRESET_CHANGED
-event_types.MAIN_API_CHANGED
-```
-Full list: [UI Extensions – Listening to events](https://docs.sillytavern.app/for_contributors/writing-extensions.md#listening-to-events)
-
-### Extension lifecycle hooks
-Register in `manifest.json`:
-```json
-{
-    "hooks": {
-        "install": "onInstall",
-        "update": "onUpdate",
-        "delete": "onDelete",
-        "enable": "onEnable",
-        "disable": "onDisable",
-        "activate": "onActivate",
-        "clean": "onClean"
-    }
-}
-```
-Export from `index.js`:
-```js
-export async function onInstall() { /* first-time setup */ }
-export async function onActivate() { /* page load activation */ }
-export async function onUpdate() { /* migration logic */ }
-```
-Full details: [UI Extensions – Lifecycle Hooks](https://docs.sillytavern.app/for_contributors/writing-extensions.md#lifecycle-hooks)
-
-### Prompt interceptors
-Register in `manifest.json`:
-```json
-{
-    "generate_interceptor": "myInterceptor"
-}
-```
-Interceptor function signature:
-```js
-globalThis.myInterceptor = async function(chat, contextSize, abort, type) {
-    // chat: mutable array of message objects
-    // contextSize: current context size in tokens
-    // abort: call abort(true) to prevent generation
-    // type: 'quiet', 'regenerate', 'impersonate', etc.
-};
-```
-
-### Settings presets extension fields
-```js
-const pm = SillyTavern.getContext().getPresetManager();
-await pm.writePresetExtensionField({ path: 'my_key', value: 'my_value' });
-const value = pm.readPresetExtensionField({ path: 'my_key' });
-```
-
-## Extension manifest
-
-`manifest.json` declares the extension to SillyTavern:
-- `js`: `dist/index.js` (the webpack output)
-- `loading_order`: 999 (loads very late)
-- `auto_update`: true
-
-## Naming conventions
-
-- Settings keys use `promptmirror_*` prefix in HTML (`#promptmirror_line_numbers`, `#promptmirror_theme_preset`)
-- JS settings object uses camelCase: `extension_settings.promptmirror.features.gutter.showLineNum`
-- CSS classes use kebab-case: `.codemirror-host`, `.cm-search-button`
-- All functions and exports use camelCase
-
-## Best practices
-
-**Never store API keys or secrets in `extensionSettings`** — settings are accessible to all extensions and stored in plain text.
-
-**Use `getContext()` over direct imports** — the context API is more stable across SillyTavern updates.
-
-**Clean up event listeners** — remove listeners when no longer needed to prevent memory leaks.
-
-**Don't block the UI thread** — use async/await for I/O operations; break up heavy computations with yields.
-
-**Use unique module names** — prevent conflicts with other extensions using descriptive names.
-
-**Provide clear feedback** — use `toastr` for notifications, `Popup` for user interactions, `loader` for long operations.
-
-## References
-
-- [SillyTavern UI Extensions Guide](https://docs.sillytavern.app/for_contributors/writing-extensions.md)
-- [SillyTavern GitHub Repository](https://github.com/SillyTavern/SillyTavern)
-- [SillyTavern Documentation](https://docs.sillytavern.app/)
-- [Character Cards V2 Specification](https://github.com/malfoyslastname/character-card-spec-v2)
+1. Define Lezer nodes in `src/syntax/handlebars.js` style (`defineNodes` + `parseInline`)
+2. Export the config and import in `src/index.js`
+3. Pass to the markdown extension config in `setupCodeMirror()`
+4. Add highlight styles in `src/themes/fsegurai.js` if needed

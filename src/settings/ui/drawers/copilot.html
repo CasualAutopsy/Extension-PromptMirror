@@ -1,0 +1,123 @@
+<div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+        <b>(WIP)PromptMirror - Copilot</b>
+        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    </div>
+    <div class="inline-drawer-content pm-content">
+        <h4 class="standoutHeader pm-divider title_restorable justifySpaceBetween">
+            <div class="flex-container">
+                <span>Inline Completions</span>
+            </div>
+            <div class="flex-container">
+                <label id="pm_inline_enabled_label" for="pm_inline_enabled" class="checkbox_label flex1">
+                    <input id="pm_inline_enabled" type="checkbox" style="display: none;"/>
+                    <small>
+                        <i class="fa-solid fa-power-off menu_button togglable margin0" tabindex="0" role="button"></i>
+                    </small>
+                </label>
+            </div>
+        </h4>
+
+        <div id="pm_inline_block">
+            <strong>API URL:</strong>
+            <hr/>
+            <div class="flex-container">
+                <select id="pm_inline_api_source" class="text_pole flex1">
+                    <option value="llamacpp">LlamaC++</option>
+                    <option value="koboldcpp">KoboldC++</option>
+                </select>
+                <input id="pm_api_url" class="text_pole flex2" placeholder="e.g. http://127.0.0.1:8080"/>
+            </div>
+            <br/>
+            <strong>Text Completion Preset:</strong>
+            <hr/>
+            <div class="flex-container">
+                <select id="pm_inline_tc_preset" class="text_pole flex1">
+                    <option value="None" selected="">None</option>
+                </select>
+            </div>
+            <br/>
+            <strong>FiM Template:</strong>
+            <hr/>
+            <small><b>Avaliable macros:</b>
+                <br/>==Sequences==
+                <br/>{{prefix_sequence}}, {{suffix_sequence}}, {{middle_sequence}}
+                <br/>==FiM Prompts==
+                <br/>{{prefix_prompt}}, {{suffix_prompt}}
+            </small>
+            <div class="flex-container">
+                <textarea id="pm_inline_template" class="text_pole textarea_compact autoSetHeight" placeholder="{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}"></textarea>
+            </div>
+            <br/>
+
+            <div class="flex-container">
+                <div class="flexAuto">
+                    <label for="fim_inline_prefix">
+                        <small>FiM Prefix</small>
+                    </label>
+                    <div>
+                        <textarea id="fim_inline_prefix" class="text_pole textarea_compact autoSetHeight"></textarea>
+                    </div>
+                </div>
+                <div class="flexAuto">
+                    <label for="fim_inline_suffix">
+                        <small>FiM Suffix</small>
+                    </label>
+                    <div>
+                        <textarea id="fim_inline_suffix" class="text_pole textarea_compact autoSetHeight"></textarea>
+                    </div>
+                </div>
+                <div class="flexAuto">
+                    <label for="fim_inline_middle">
+                        <small>FiM Middle</small>
+                    </label>
+                    <div>
+                        <textarea id="fim_inline_middle" class="text_pole textarea_compact autoSetHeight"></textarea>
+                    </div>
+                </div>
+            </div>
+            <hr/>
+
+            <h4 class="standoutHeader pm-divider title_restorable justifySpaceBetween">
+                <div class="flex-container">
+                    <span>Character Card Inline Completions</span>
+                </div>
+                <div class="flex-container">
+                    <label id="pm_char_inline_enabled_label" for="pm_char_inline_enabled" class="checkbox_label flex1">
+                        <input id="pm_char_inline_enabled" type="checkbox" style="display: none;"/>
+                        <small>
+                            <i class="fa-solid fa-power-off menu_button togglable margin0" tabindex="0" role="button"></i>
+                        </small>
+                    </label>
+                </div>
+            </h4>
+            <div id="pm_char_inline_block">
+                <strong>Include Fields:</strong>
+                <hr/>
+                <div class="flex-container" style="flex-direction: column; align-items: flex-start;">
+                    <label class="checkbox_label" for="pm_char_field_description">
+                        <input id="pm_char_field_description" type="checkbox" class="checkbox"/>
+                        <small>Description</small>
+                    </label>
+                    <label class="checkbox_label" for="pm_char_field_personality">
+                        <input id="pm_char_field_personality" type="checkbox" class="checkbox"/>
+                        <small>Personality</small>
+                    </label>
+                    <label class="checkbox_label" for="pm_char_field_scenario">
+                        <input id="pm_char_field_scenario" type="checkbox" class="checkbox"/>
+                        <small>Scenario</small>
+                    </label>
+                    <label class="checkbox_label" for="pm_char_field_first_message">
+                        <input id="pm_char_field_first_message" type="checkbox" class="checkbox"/>
+                        <small>First Message</small>
+                    </label>
+                    <label class="checkbox_label" for="pm_char_field_example_dialogue">
+                        <input id="pm_char_field_example_dialogue" type="checkbox" class="checkbox"/>
+                        <small>Example Dialogue</small>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <hr/>
+    </div>
+</div>

@@ -5,6 +5,7 @@
 /.pnp
 .pnp.js
 /repos
+.chunkhound
 
 # testing
 /coverage

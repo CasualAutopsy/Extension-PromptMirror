@@ -1,4 +1,11 @@
 // @ts-nocheck
+
+/**
+ * @fileoverview PromptMirror extension settings management.
+ * Handles loading, migrating, persisting, and UI binding for all extension settings
+ * including presets, syntax colours, feature toggles, and inline copilot configuration.
+ */
+
 import {
     importTheme,
     exportTheme,
@@ -10,257 +17,228 @@ import {
     getThemePresetNameList, getFeaturePresetNameList
 } from './presets.js';
 
-import {loadInlineSettings, initInlineSettingListeners} from './../copilot/inline/settings.js';
+import {loadInlineSettings, initInlineSettingListeners} from './scripts/inline.js';
 
 const { extension_settings } = await import(/* webpackIgnore: true */ '/scripts/extensions.js');
 const { saveSettingsDebounced } = await import(/* webpackIgnore: true */ '/script.js');
 const { parseJsonFile, download } = await import(/* webpackIgnore: true */ '/scripts/utils.js');
 
+/** Unique namespace used within SillyTavern's global `extension_settings` store. */
 export const extensionName = 'Extension-PromptMirror'
+    /** Relative path to this extension's source directory, used for loading assets. */
     , extensionPath = `scripts/extensions/third-party/${extensionName}/src`;
 
-const default_theme_presets = [
-    {
-        version: '0.1.1',
-        name: 'Default (Dark) - By fsegurai',
-        data: {
-            accent_colours: {
-                accent01: 'rgb(86, 156, 214)',
-                accent02: 'rgb(197, 134, 192)',
-                accent03: 'rgb(156, 220, 254)',
-                accent04: 'rgb(78, 201, 176)',
-                accent05: 'rgb(220, 220, 170)',
-                accent06: 'rgb(206, 145, 120)',
-                accent07: 'rgb(244, 71, 71)',
-                accent08: 'rgb(106, 153, 85)',
-                accent09: 'rgb(181, 206, 168)',
-                accent10: 'rgb(215, 186, 125)',
+/**
+ * Canonical default settings schema.
+ * Serves as the single source of truth for all setting keys, types, and default values.
+ * Used by `loadSettings`, `migrateSettings`, and the emergency debug reset button.
+ *
+ * Structure:
+ * - metadata.version   — schema version for migration detection
+ * - presets.theme      — available theme presets with accent colour palettes
+ * - presets.features   — available feature presets with editor behaviour toggles
+ * - syntax.accent_colours — active 10-colour accent palette for syntax highlighting
+ * - features           — active editor feature toggles (gutter, highlighting)
+ * - copilot.inline     — inline completion (FIM) configuration
+ */
+const DEFAULT_SETTINGS = {
+    metadata: { version: '0.1' },
+    presets: {
+        theme: {
+            current: 'Default (Dark) - By fsegurai',
+            list: [
+                {
+                    version: '0.1.1',
+                    name: 'Default (Dark) - By fsegurai',
+                    data: {
+                        accent_colours: {
+                            accent01: 'rgb(86, 156, 214)',
+                            accent02: 'rgb(197, 134, 192)',
+                            accent03: 'rgb(156, 220, 254)',
+                            accent04: 'rgb(78, 201, 176)',
+                            accent05: 'rgb(220, 220, 170)',
+                            accent06: 'rgb(206, 145, 120)',
+                            accent07: 'rgb(244, 71, 71)',
+                            accent08: 'rgb(106, 153, 85)',
+                            accent09: 'rgb(181, 206, 168)',
+                            accent10: 'rgb(215, 186, 125)',
+                        }
+                    }
+                }
+            ]
+        },
+        features: {
+            current: 'PromptMirror Lite',
+            list: [
+                {
+                    version: '0.1.1',
+                    name: 'PromptMirror Lite',
+                    data: {
+                        gutter: { showLineNum: false },
+                        highlighting: {
+                            active_line: true,
+                            draw_selection: true,
+                            selection_matches: true,
+                            bracket_matching: true,
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    syntax: {
+        accent_colours: {
+            accent01: 'rgb(86, 156, 214)',
+            accent02: 'rgb(197, 134, 192)',
+            accent03: 'rgb(156, 220, 254)',
+            accent04: 'rgb(78, 201, 176)',
+            accent05: 'rgb(220, 220, 170)',
+            accent06: 'rgb(206, 145, 120)',
+            accent07: 'rgb(244, 71, 71)',
+            accent08: 'rgb(106, 153, 85)',
+            accent09: 'rgb(181, 206, 168)',
+            accent10: 'rgb(215, 186, 125)',
+        }
+    },
+    features: {
+        gutter: { showLineNum: false },
+        highlighting: {
+            active_line: true,
+            draw_selection: true,
+            selection_matches: true,
+            bracket_matching: true,
+        }
+    },
+    copilot: {
+        inline: {
+            enabled: false,
+            api_type: 'llamacpp',
+            base_url: 'http://127.0.0.1:8080',
+            sequences: { prefix: '▙', suffix: '▛', middle: '▜' },
+            template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
+            tc_preset: 'None',
+            charCardEnabled: false,
+            charFields: {
+                description: true,
+                personality: true,
+                scenario: true,
+                first_message: true,
+                example_dialogue: true,
             }
         }
     }
-];
+};
 
-const default_feature_presets = [
-    {
-        version: '0.1.1',
-        name: 'PromptMirror Lite',
-        data: {
-            gutter: {
-                showLineNum: false,
-            },
-            highlighting: {
-                active_line: true,
-                draw_selection: true,
-                selection_matches: true,
-                bracket_matching: true,
-            }
-        }
-    }
-];
-
-
+/** Deep copy of the default theme preset list. Locked presets cannot be edited via UI. */
+const default_theme_presets = DEFAULT_SETTINGS.presets.theme.list;
+/** Deep copy of the default feature preset list. Locked presets cannot be edited via UI. */
+const default_feature_presets = DEFAULT_SETTINGS.presets.features.list;
 
 /**
- * Ensure all expected settings properties exist with their default values.
- * Missing keys are added automatically so future updates don't break old configs.
+ * Backfill missing or type-invalid settings properties with their default values.
+ * Called during `loadSettings` when the stored version is missing or outdated.
+ *
+ * Uses nullish coalescing (`??`) to preserve existing values while filling gaps.
+ * For nested objects (sequences, charFields), performs recursive type checking.
+ *
+ * @param {object} settings — The current settings object from `extension_settings.promptmirror`.
+ * @returns {object} The migrated settings object (mutated in place).
  */
 function migrateSettings(settings) {
     // metadata.version
-    if (typeof settings.metadata?.version !== 'string') {
-        settings.metadata = settings.metadata || {};
+    settings.metadata ??= {};
+    if (typeof settings.metadata.version !== 'string') {
         settings.metadata.version = '0.1';
     }
 
     // presets.theme
-    if (!settings.presets?.theme) {
-        settings.presets = settings.presets || {};
-        settings.presets.theme = {
-            current: 'Default (Dark) - By fsegurai',
-            list: [...default_theme_presets]
-        };
-    }
+    settings.presets ??= {};
+    settings.presets.theme ??= { current: 'Default (Dark) - By fsegurai', list: [...default_theme_presets] };
     if (!settings.presets.theme.list) {
         settings.presets.theme.list = [...default_theme_presets];
     }
 
     // presets.features
-    if (!settings.presets?.features) {
-        settings.presets = settings.presets || {};
-        settings.presets.features = {
-            current: 'PromptMirror Lite',
-            list: [...default_feature_presets]
-        };
-    }
+    settings.presets.features ??= { current: 'PromptMirror Lite', list: [...default_feature_presets] };
     if (!settings.presets.features.list) {
         settings.presets.features.list = [...default_feature_presets];
     }
 
     // syntax.accent_colours
-    if (!settings.syntax) {
-        settings.syntax = {};
-    }
-    if (!settings.syntax.accent_colours) {
-        settings.syntax.accent_colours = {};
-    }
+    settings.syntax ??= {};
+    settings.syntax.accent_colours ??= {};
     for (let i = 1; i <= 10; i++) {
         const key = `accent${String(i).padStart(2, '0')}`;
         if (typeof settings.syntax.accent_colours[key] !== 'string') {
-            settings.syntax.accent_colours[key] = default_theme_presets[0].data.accent_colours[key];
+            settings.syntax.accent_colours[key] = DEFAULT_SETTINGS.syntax.accent_colours[key];
         }
     }
 
     // features.gutter
-    if (!settings.features) {
-        settings.features = {};
-    }
-    if (!settings.features.gutter) {
-        settings.features.gutter = { showLineNum: false };
-    }
+    settings.features ??= {};
+    settings.features.gutter ??= { showLineNum: false };
     if (typeof settings.features.gutter.showLineNum !== 'boolean') {
         settings.features.gutter.showLineNum = false;
     }
 
     // features.highlighting
-    if (!settings.features.highlighting) {
-        settings.features.highlighting = {
-            active_line: true,
-            draw_selection: true,
-            selection_matches: true,
-            bracket_matching: true,
-        };
-    }
-    if (typeof settings.features.highlighting.active_line !== 'boolean') {
-        settings.features.highlighting.active_line = true;
-    }
-    if (typeof settings.features.highlighting.draw_selection !== 'boolean') {
-        settings.features.highlighting.draw_selection = true;
-    }
-    if (typeof settings.features.highlighting.selection_matches !== 'boolean') {
-        settings.features.highlighting.selection_matches = true;
-    }
-    if (typeof settings.features.highlighting.bracket_matching !== 'boolean') {
-        settings.features.highlighting.bracket_matching = true;
+    settings.features.highlighting ??= {
+        active_line: true,
+        draw_selection: true,
+        selection_matches: true,
+        bracket_matching: true,
+    };
+    for (const key of ['active_line', 'draw_selection', 'selection_matches', 'bracket_matching']) {
+        if (typeof settings.features.highlighting[key] !== 'boolean') {
+            settings.features.highlighting[key] = DEFAULT_SETTINGS.features.highlighting[key];
+        }
     }
 
     // copilot.inline
-    if (!settings.copilot) {
-        settings.copilot = {};
-    }
-    if (!settings.copilot.inline) {
-        settings.copilot.inline = {
-            enabled: false,
-            api_type: 'llamacpp',
-            base_url: 'http://127.0.0.1:8080',
-            sequences: {
-                prefix: '<|fim_prefix|>',
-                suffix: '<|fim_suffix|>',
-                middle: '<|fim_middle|>',
-            },
-            template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
-            tc_preset: 'None'
-        };
-    }
+    settings.copilot ??= {};
+    settings.copilot.inline ??= structuredClone(DEFAULT_SETTINGS.copilot.inline);
     const ci = settings.copilot.inline;
+
     if (typeof ci.enabled !== 'boolean') ci.enabled = false;
     if (typeof ci.api_type !== 'string') ci.api_type = 'llamacpp';
     if (typeof ci.base_url !== 'string') ci.base_url = 'http://127.0.0.1:8080';
-    if (!ci.sequences) {
-        ci.sequences = { prefix: '<|fim_prefix|>', suffix: '<|fim_suffix|>', middle: '<|fim_middle|>' };
-    }
-    if (typeof ci.sequences.prefix !== 'string') ci.sequences.prefix = '<|fim_prefix|>';
-    if (typeof ci.sequences.suffix !== 'string') ci.sequences.suffix = '<|fim_suffix|>';
-    if (typeof ci.sequences.middle !== 'string') ci.sequences.middle = '<|fim_middle|>';
-    if (typeof ci.template !== 'string') ci.template = '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}';
+
+    ci.sequences ??= { prefix: '▙', suffix: '▛', middle: '▜' };
+    if (typeof ci.sequences.prefix !== 'string') ci.sequences.prefix = '▙';
+    if (typeof ci.sequences.suffix !== 'string') ci.sequences.suffix = '▛';
+    if (typeof ci.sequences.middle !== 'string') ci.sequences.middle = '▜';
+
+    if (typeof ci.template !== 'string') ci.template = DEFAULT_SETTINGS.copilot.inline.template;
     if (typeof ci.tc_preset !== 'string') ci.tc_preset = 'None';
     if (typeof ci.charCardEnabled !== 'boolean') ci.charCardEnabled = false;
-    if (!ci.charFields) {
-        ci.charFields = {
-            description: true,
-            personality: true,
-            scenario: true,
-            first_message: true,
-            example_dialogue: true,
-        };
+
+    ci.charFields ??= structuredClone(DEFAULT_SETTINGS.copilot.inline.charFields);
+    for (const key of Object.keys(DEFAULT_SETTINGS.copilot.inline.charFields)) {
+        if (typeof ci.charFields[key] !== 'boolean') {
+            ci.charFields[key] = DEFAULT_SETTINGS.copilot.inline.charFields[key];
+        }
     }
-    if (typeof ci.charFields.description !== 'boolean') ci.charFields.description = true;
-    if (typeof ci.charFields.personality !== 'boolean') ci.charFields.personality = true;
-    if (typeof ci.charFields.scenario !== 'boolean') ci.charFields.scenario = true;
-    if (typeof ci.charFields.first_message !== 'boolean') ci.charFields.first_message = true;
-    if (typeof ci.charFields.example_dialogue !== 'boolean') ci.charFields.example_dialogue = true;
 
     return settings;
 }
 
 /**
- * Load settings states from the extension_settings object
+ * Initialize settings from the SillyTavern global store, applying migration if needed,
+ * then populate all UI controls to reflect the current settings state.
+ *
+ * Flow:
+ * 1. Create default settings blob if none exists
+ * 2. Run migration if version is missing or outdated
+ * 3. Persist to localStorage via `saveSettingsDebounced`
+ * 4. Sync every UI control (checkboxes, colour pickers, selects)
+ * 5. Load inline copilot settings
  */
 export async function loadSettings() {
-    if ( !extension_settings.promptmirror ) {
-        extension_settings.promptmirror = {
-            metadata: {
-                version: '0.1',
-            },
-            presets: {
-                theme: {
-                    current: 'Default (Dark) - By fsegurai',
-                    list: [...default_theme_presets]
-                },
-                features: {
-                    current: 'PromptMirror Lite',
-                    list: [...default_feature_presets]
-                }
-            },
-            syntax: {
-                accent_colours: {
-                    accent01: 'rgb(86, 156, 214)',    // Headers, Bold
-                    accent02: 'rgb(197, 134, 192)',   // Macro Wrapping(cycle 1), Links, Images
-                    accent03: 'rgb(156, 220, 254)',   // Macro Wrapping(cycle 2)
-                    accent04: 'rgb(78, 201, 176)',    // Macro Wrapping(cycle 3), Emphasis, Emph-Bold
-                    accent05: 'rgb(220, 220, 170)',   // Macro Labels, Code Blocks(shortcodes)
-                    accent06: 'rgb(206, 145, 120)',   // Macro Arg Separators, Lists, Tabels, Code
-                    accent07: 'rgb(244, 71, 71)',     // Strikethrough
-                    accent08: 'rgb(106, 153, 85)',    // Quotes, Comment Macros
-                    accent09: 'rgb(181, 206, 168)',   // Other 1(other languages)
-                    accent10: 'rgb(215, 186, 125)',   // Other 2(other languages)
-                },
-            },
-            features: {
-                gutter: {
-                    showLineNum: false,
-                },
-                highlighting: {
-                    active_line: true,
-                    draw_selection: true,
-                    selection_matches: true,
-                    bracket_matching: true,
-                }
-            },
-            copilot: {
-                inline: {
-                    enabled: false,
-                    api_type: 'llamacpp',
-                    base_url: 'http://127.0.0.1:8080',
-                    sequences: {
-                        prefix: '<|fim_prefix|>',
-                        suffix: '<|fim_suffix|>',
-                        middle: '<|fim_middle|>',
-                    },
-                    template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
-                    tc_preset: 'None',
-                    charCardEnabled: false,
-                    charFields: {
-                        description: true,
-                        personality: true,
-                        scenario: true,
-                        first_message: true,
-                        example_dialogue: true,
-                    }
-                }
-            }
-        };
+    if (!extension_settings.promptmirror) {
+        extension_settings.promptmirror = structuredClone(DEFAULT_SETTINGS);
     }
 
-    // Ensure all expected properties exist with defaults
+    // Migrate if version is missing or outdated
     const currentVersion = '0.1';
     const storedVersion = extension_settings.promptmirror.metadata?.version;
     if (!storedVersion || storedVersion < currentVersion) {
@@ -270,183 +248,127 @@ export async function loadSettings() {
     saveSettingsDebounced();
 
     // Features - Gutter
-    $('#promptmirror_line_numbers')         .prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
-
+    $('#promptmirror_line_numbers').prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
 
     // Features - Highlighting
-    $('#promptmirror_active_line')          .prop('checked', extension_settings.promptmirror.features.highlighting.active_line);
-    $('#promptmirror_draw_selection')       .prop('checked', extension_settings.promptmirror.features.highlighting.draw_selection);
-    $('#promptmirror_selection_matches')    .prop('checked', extension_settings.promptmirror.features.highlighting.selection_matches);
-    $('#promptmirror_bracket_matching')     .prop('checked', extension_settings.promptmirror.features.highlighting.bracket_matching);
+    _setCheckboxes([
+        ['#promptmirror_active_line', 'active_line'],
+        ['#promptmirror_draw_selection', 'draw_selection'],
+        ['#promptmirror_selection_matches', 'selection_matches'],
+        ['#promptmirror_bracket_matching', 'bracket_matching'],
+    ], extension_settings.promptmirror.features.highlighting);
 
+    // Syntax - Accent Colours
+    _syncColourPickers();
 
-    // syntaxs - Accent Colours
-    $('#promptmirror_colour_accent01')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent01);
-    $('#promptmirror_colour_accent02')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent02);
-    $('#promptmirror_colour_accent03')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent03);
-    $('#promptmirror_colour_accent04')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent04);
-    $('#promptmirror_colour_accent05')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent05);
-    $('#promptmirror_colour_accent06')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent06);
-    $('#promptmirror_colour_accent07')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent07);
-    $('#promptmirror_colour_accent08')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent08);
-    $('#promptmirror_colour_accent09')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent09);
-    $('#promptmirror_colour_accent10')      .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent10);
-
-
-    // Presets //
-    //-----------
-    // Presets - Theme Presets
+    // Presets - Theme
     populateThemePresetSelectionHTML();
+    $('#promptmirror_theme_preset').val(extension_settings.promptmirror.presets.theme.current);
 
-    $('#promptmirror_theme_preset')         .val(extension_settings.promptmirror.presets.theme.current);
-
-
-    // Presets - Feature Presets
+    // Presets - Features
     populateFeaturePresetSelectionHTML();
+    $('#promptmirror_feature_preset').val(extension_settings.promptmirror.presets.features.current);
 
-
-    $('#promptmirror_feature_preset')       .val(extension_settings.promptmirror.presets.features.current);
-
-    // Inline Completions //
-    //----------------------
+    // Inline Completions
     loadInlineSettings();
 }
 
 /**
- * Populate the HTML select element with preset options.
+ * Sync checked state of multiple checkbox elements from a settings data object.
+ *
+ * @param {Array<[string, string]>} selectors — Array of `[jQuery_selector, settings_key]` tuples.
+ * @param {object} data — The settings object containing boolean values keyed by `settings_key`.
+ */
+function _setCheckboxes(selectors, data) {
+    for (const [selector, key] of selectors) {
+        $(selector).prop('checked', !!data[key]);
+    }
+}
+
+/**
+ * Push all 10 accent colour values from settings into their corresponding
+ * colour picker elements' `color` attribute.
+ */
+function _syncColourPickers() {
+    const colours = extension_settings.promptmirror.syntax.accent_colours;
+    for (let i = 1; i <= 10; i++) {
+        const key = `accent${String(i).padStart(2, '0')}`;
+        $(`#promptmirror_colour_${key}`).attr('color', colours[key]);
+    }
+}
+
+/**
+ * Populate the theme preset `<select>` dropdown with all available preset names,
+ * then sync the colour pickers to match the currently active theme.
  */
 function populateThemePresetSelectionHTML() {
     const presetNames = getThemePresetNameList();
     const presetSelect = $('#promptmirror_theme_preset');
-
-    presetSelect.empty(); // Clear existing options
-
-    // Populate the select with new options
+    presetSelect.empty();
     presetNames.forEach((name) => {
         presetSelect.append(`<option value="${name}">${name}</option>`);
     });
-
     refreshThemeSettings();
 }
 
 /**
- * Populate the HTML select element with preset options.
+ * Populate the feature preset `<select>` dropdown with all available preset names,
+ * then sync the feature toggles (gutter, highlighting) to match the currently active preset.
  */
 function populateFeaturePresetSelectionHTML() {
     const presetNames = getFeaturePresetNameList();
     const presetSelect = $('#promptmirror_feature_preset');
-
-    presetSelect.empty(); // Clear existing options
-
-    // Populate the select with new options
+    presetSelect.empty();
     presetNames.forEach((name) => {
         presetSelect.append(`<option value="${name}">${name}</option>`);
     });
-
     refreshFeatureSettings();
 }
 
 /**
- * Refresh the theme settings menu.
+ * Re-sync the theme preset UI: set the select value to the current preset name
+ * and update all colour pickers to reflect the active palette.
  */
 function refreshThemeSettings() {
-    $('#promptmirror_theme_preset')             .val(extension_settings.promptmirror.presets.theme.current);
-
-    $('#promptmirror_colour_accent01')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent01);
-    $('#promptmirror_colour_accent02')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent02);
-    $('#promptmirror_colour_accent03')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent03);
-    $('#promptmirror_colour_accent04')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent04);
-    $('#promptmirror_colour_accent05')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent05);
-    $('#promptmirror_colour_accent06')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent06);
-    $('#promptmirror_colour_accent07')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent07);
-    $('#promptmirror_colour_accent08')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent08);
-    $('#promptmirror_colour_accent09')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent09);
-    $('#promptmirror_colour_accent10')          .attr('color', extension_settings.promptmirror.syntax.accent_colours.accent10);
+    $('#promptmirror_theme_preset').val(extension_settings.promptmirror.presets.theme.current);
+    _syncColourPickers();
 }
 
 /**
- * Refresh the feature settings menu.
+ * Re-sync the feature preset UI: set the select value to the current preset name,
+ * update the gutter checkbox, and sync all highlighting toggle checkboxes.
  */
 function refreshFeatureSettings() {
-    $('#promptmirror_feature_preset')       .val(extension_settings.promptmirror.presets.features.current);
-
-    $('#promptmirror_line_numbers')         .prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
-
-    $('#promptmirror_active_line')          .prop('checked', extension_settings.promptmirror.features.highlighting.active_line);
-    $('#promptmirror_draw_selection')       .prop('checked', extension_settings.promptmirror.features.highlighting.draw_selection);
-    $('#promptmirror_selection_matches')    .prop('checked', extension_settings.promptmirror.features.highlighting.selection_matches);
-    $('#promptmirror_bracket_matching')     .prop('checked', extension_settings.promptmirror.features.highlighting.bracket_matching);
+    $('#promptmirror_feature_preset').val(extension_settings.promptmirror.presets.features.current);
+    $('#promptmirror_line_numbers').prop('checked', extension_settings.promptmirror.features.gutter.showLineNum);
+    _setCheckboxes([
+        ['#promptmirror_active_line', 'active_line'],
+        ['#promptmirror_draw_selection', 'draw_selection'],
+        ['#promptmirror_selection_matches', 'selection_matches'],
+        ['#promptmirror_bracket_matching', 'bracket_matching'],
+    ], extension_settings.promptmirror.features.highlighting);
 }
 
+/**
+ * Wire up every settings UI control to its corresponding settings mutation handler.
+ *
+ * Event bindings:
+ * - Emergency debug reset → restores `DEFAULT_SETTINGS` and re-syncs UI
+ * - Gutter checkbox → toggles `features.gutter.showLineNum`
+ * - Highlighting checkboxes → toggle individual `features.highlighting.*` booleans
+ * - Colour pickers → update `syntax.accent_colours` on change
+ * - Theme preset select → apply preset palette and update current preset name
+ * - Theme CRUD buttons → delegate to `presets.js` functions
+ * - Feature preset select → apply preset data and update current preset name
+ * - Feature CRUD buttons → delegate to `presets.js` functions
+ * - Inline copilot → delegates to `initInlineSettingListeners`
+ */
 export function registerListeners() {
     // Emergency Debug Button
     $('#alpha_debug_button').on('click', () => {
-        extension_settings.promptmirror = {
-            metadata: {
-                version: '0.1',
-            },
-            presets: {
-                theme: {
-                    current: 'Default (Dark) - By fsegurai',
-                    list: [...default_theme_presets]
-                },
-                features: {
-                    current: 'PromptMirror Lite',
-                    list: [...default_feature_presets]
-                }
-            },
-            syntax: {
-                accent_colours: {
-                    accent01: 'rgb(86, 156, 214)',    // Headers, Bold
-                    accent02: 'rgb(197, 134, 192)',   // Macro Wrapping(cycle 1), Links, Images
-                    accent03: 'rgb(156, 220, 254)',   // Macro Wrapping(cycle 2)
-                    accent04: 'rgb(78, 201, 176)',    // Macro Wrapping(cycle 3), Emphasis, Emph-Bold
-                    accent05: 'rgb(220, 220, 170)',   // Macro Labels, Code Blocks(shortcodes)
-                    accent06: 'rgb(206, 145, 120)',   // Macro Arg Separators, Lists, Tabels, Code
-                    accent07: 'rgb(244, 71, 71)',     // Strikethrough
-                    accent08: 'rgb(106, 153, 85)',    // Quotes, Comment Macros
-                    accent09: 'rgb(181, 206, 168)',   // Other 1(other languages)
-                    accent10: 'rgb(215, 186, 125)',   // Other 2(other languages)
-                },
-            },
-            features: {
-                gutter: {
-                    showLineNum: false,
-                },
-                highlighting: {
-                    active_line: true,
-                    draw_selection: true,
-                    selection_matches: true,
-                    bracket_matching: true,
-                }
-            },
-            copilot: {
-                inline: {
-                    enabled: false,
-                    api_type: 'llamacpp',
-                    base_url: 'http://127.0.0.1:8080',
-                    sequences: {
-                        prefix: '<|fim_prefix|>',
-                        suffix: '<|fim_suffix|>',
-                        middle: '<|fim_middle|>',
-                    },
-                    template: '{{prefix_sequence}}{{prefix_prompt}}{{suffix_sequence}}{{suffix_prompt}}{{middle_sequence}}',
-                    tc_preset: 'None',
-                    charCardEnabled: false,
-                    charFields: {
-                        description: true,
-                        personality: true,
-                        scenario: true,
-                        first_message: true,
-                        example_dialogue: true,
-                    }
-                }
-            }
-        };
-
+        extension_settings.promptmirror = structuredClone(DEFAULT_SETTINGS);
         loadSettings();
     });
-
 
     // Features - Gutter
     $('#promptmirror_line_numbers').on('click', () => {
@@ -454,94 +376,36 @@ export function registerListeners() {
         saveSettingsDebounced();
     });
 
-
     // Features - Highlighting
-    $('#promptmirror_active_line').on('click', () => {
-        extension_settings.promptmirror.features.highlighting.active_line = $('#promptmirror_active_line').prop('checked');
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_draw_selection').on('click', () => {
-        extension_settings.promptmirror.features.highlighting.draw_selection = $('#promptmirror_draw_selection').prop('checked');
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_selection_matches').on('click', () => {
-        extension_settings.promptmirror.features.highlighting.selection_matches = $('#promptmirror_selection_matches').prop('checked');
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_bracket_matching').on('click', () => {
-        extension_settings.promptmirror.features.highlighting.bracket_matching = $('#promptmirror_bracket_matching').prop('checked');
-        saveSettingsDebounced();
-    });
-
+    for (const [selector, key] of [
+        ['#promptmirror_active_line', 'active_line'],
+        ['#promptmirror_draw_selection', 'draw_selection'],
+        ['#promptmirror_selection_matches', 'selection_matches'],
+        ['#promptmirror_bracket_matching', 'bracket_matching'],
+    ]) {
+        $(selector).on('click', () => {
+            extension_settings.promptmirror.features.highlighting[key] = $(selector).prop('checked');
+            saveSettingsDebounced();
+        });
+    }
 
     // Themes - Accent Colours
-    $('#promptmirror_colour_accent01').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent01 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent02').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent02 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent03').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent03 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent04').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent04 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent05').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent05 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent06').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent06 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent07').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent07 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent08').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent08 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent09').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent09 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
-    $('#promptmirror_colour_accent10').on('change', (event) => {
-        extension_settings.promptmirror.theme.accent_colours.accent10 = event.detail.rgba;
-        saveSettingsDebounced();
-    });
-
+    for (let i = 1; i <= 10; i++) {
+        const key = `accent${String(i).padStart(2, '0')}`;
+        $(`#promptmirror_colour_${key}`).on('change', (event) => {
+            extension_settings.promptmirror.syntax.accent_colours[key] = event.detail.rgba;
+            saveSettingsDebounced();
+        });
+    }
 
     // Presets - Theme
     $('#promptmirror_theme_preset').on('change', () => {
-        const selectedPreset = $('#promptmirror_theme_preset').val(),
-        presetData = extension_settings.promptmirror.presets.theme.list.find((preset) => preset.name === selectedPreset).data;
+        const selectedPreset = $('#promptmirror_theme_preset').val();
+        const preset = extension_settings.promptmirror.presets.theme.list.find((p) => p.name === selectedPreset);
+        if (!preset) return;
 
-        // Deep clone the preset data into the extension settings
-        // to prevent any references to the original data
-        extension_settings.promptmirror.theme = structuredClone(presetData);
-
-        // Update current preset
+        extension_settings.promptmirror.syntax.accent_colours = structuredClone(preset.data.accent_colours);
         extension_settings.promptmirror.presets.theme.current = selectedPreset;
-
-        // Save the settings and refresh the theme settings menu
         saveSettingsDebounced();
         refreshThemeSettings();
     });
@@ -549,36 +413,23 @@ export function registerListeners() {
     // $('#promptmirror_theme_import').on('click', () => {
     //     $('#promptmirror_theme_import_file').trigger('click');
     // });
-
     // $('#promptmirror_theme_import_file').on('change', importTheme);
-
     // $('#promptmirror_theme_export').on('click', exportTheme);
 
     $('#promptmirror_theme_update').on('click', updateTheme);
-
     $('#promptmirror_theme_rename').on('click', renameTheme);
-
     $('#promptmirror_theme_create').on('click', createTheme);
-
     $('#promptmirror_theme_reload').on('click', reloadTheme);
-
     $('#promptmirror_theme_delete').on('click', deleteTheme);
-
-
 
     // Presets - Features
     $('#promptmirror_feature_preset').on('change', () => {
         const selectedPreset = $('#promptmirror_feature_preset').val();
-        const presetData = extension_settings.promptmirror.presets.features.list.find((preset) => preset.name === selectedPreset).data;
+        const preset = extension_settings.promptmirror.presets.features.list.find((p) => p.name === selectedPreset);
+        if (!preset) return;
 
-        // Deep clone the preset data into the extension settings
-        // to prevent any references to the original data
-        extension_settings.promptmirror.features = structuredClone(presetData);
-
-        // Update current preset
+        extension_settings.promptmirror.features = structuredClone(preset.data);
         extension_settings.promptmirror.presets.features.current = selectedPreset;
-
-        // Save the settings and refresh the feature settings menu
         saveSettingsDebounced();
         refreshFeatureSettings();
     });
@@ -586,26 +437,28 @@ export function registerListeners() {
     // $('#promptmirror_feature_import').on('click', () => {
     //     $('#promptmirror_feature_import_file').trigger('click');
     // });
-
     // $('#promptmirror_feature_import_file').on('change', importFeature);
-
     // $('#promptmirror_feature_export').on('click', exportFeature);
 
     $('#promptmirror_feature_update').on('click', updateFeature);
-
     $('#promptmirror_feature_rename').on('click', renameFeature);
-
     $('#promptmirror_feature_create').on('click', createFeature);
-
     $('#promptmirror_feature_reload').on('click', reloadFeature);
-
     $('#promptmirror_feature_delete').on('click', deleteFeature);
 
-    // Inline Completions //
-    //----------------------
+    // Inline Completions
     initInlineSettingListeners();
 }
 
-
-
-export { populateThemePresetSelectionHTML, populateFeaturePresetSelectionHTML, refreshThemeSettings, refreshFeatureSettings, default_theme_presets, default_feature_presets };
+/**
+ * Re-export preset population and refresh helpers for use by other modules (e.g., presets.js).
+ * Also exposes the locked default preset arrays for comparison during rename/update operations.
+ */
+export {
+    populateThemePresetSelectionHTML,
+    populateFeaturePresetSelectionHTML,
+    refreshThemeSettings,
+    refreshFeatureSettings,
+    default_theme_presets,
+    default_feature_presets
+};

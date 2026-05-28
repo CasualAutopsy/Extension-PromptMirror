@@ -1,183 +1,127 @@
-// @ts-nocheck
-import {tags as t, Tag} from '@lezer/highlight';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-
-const handleBar = Tag.define("handleBar");
-
-const cycle1 = Tag.define("hbCycle1")
-    , cycle2 = Tag.define("hbCycle2")
-    , cycle3 = Tag.define("hbCycle3");
-
-const hbLabelPrefix = Tag.define("hbLabelPrefix");
-
-Object.assign(t, {
-    handleBar: handleBar,
-
-    hbCycle1: cycle1,
-    hbCycle2: cycle2,
-    hbCycle3: cycle3,
-
-    hbLabelPrefix: hbLabelPrefix
-});
+import {tags as t} from '@lezer/highlight';
 
 /**
  * @typedef { import('@lezer/markdown').BlockContext } BlockContext
+ * @typedef { import('@lezer/markdown').InlineContext } InlineContext
  * @typedef { import('@lezer/markdown').Line } Line
  */
 
+// Character code constants
+const OPEN_BRACE = 123;   // '{'
+const CLOSE_BRACE = 125;  // '}'
+const SLASH = 47;         // '/'
+const HASH = 35;          // '#'
+const COLON = 58;         // ':'
+const SPACE = 32;
+
+// Whitespace character codes (kept for reference if needed in future extensions)
+// const WHITESPACE = new Set([32, 9, 10, 13]);
+
+/** Depth cycle markers for nested handlebar color coding. */
+const DEPTH_MARKERS = ['HandlebarMark_1', 'HandlebarMark_2', 'HandlebarMark_3'];
+
 /**
- * Check if a character is a whitespace character.
+ * Get the depth cycle marker for a given depth level.
  *
- * @param {number} ch - The character code
- * @returns {boolean} The result
+ * @param {number} depthCycle - The current depth cycle value
+ * @returns {string} The marker name
  */
-function space(ch) {
-    return ch == 32
-    || ch == 9
-    || ch == 10
-    || ch == 13;
+function getDepthMarker(depthCycle) {
+    return DEPTH_MARKERS[depthCycle];
 }
 
 /**
+ * Parse a handlebar macro starting at the given position.
  *
- * @param {BlockContext} cx
- * @param {Line} line
+ * @param {InlineContext} cx - The Lezer parse context
+ * @param {number} next - The character at the current position
+ * @param {number} pos - The starting position
+ * @returns {number} -1 if not a handlebar, otherwise element count added
  */
-function isHandleBar(cx, line) {
-    if (
-        line.next != 123 /* '{' */                  ||
-        line.text.charCodeAt(line.pos + 1) == 123   ||
-        !space(line.text.charCodeAt(line.pos + 2))
-    ) return -1;
+function parseHandlebar(cx, next, pos) {
+    // Must start with '{{' not '{{{'
+    if (next !== OPEN_BRACE || cx.char(pos + 1) !== OPEN_BRACE || cx.char(pos + 2) === OPEN_BRACE) {
+        return -1;
+    }
 
+    const elements = [cx.elt('HandlebarMark_1', pos, pos + 2)];
+    const thirdChar = cx.char(pos + 2);
+
+    // Closing macro mark or section tag marker
+    if (thirdChar === SLASH && cx.char(pos + 3) !== SLASH) {
+        elements.push(cx.elt('HandlebarLabelMark', pos + 2, pos + 3));
+    } else if (thirdChar === HASH) {
+        elements.push(cx.elt('HandlebarLabelMark', pos + 2, pos + 3));
+    }
+
+    // Handle {{/ / }} comment syntax
+    if (thirdChar === SLASH && cx.char(pos + 3) === SLASH && cx.char(pos + 4) === SPACE) {
+        for (let i = pos + 5; i < cx.end; i++) {
+            const ch = cx.char(i);
+
+            if (ch === CLOSE_BRACE && cx.char(i + 1) === CLOSE_BRACE) {
+                return cx.addElement(
+                    cx.elt('Comment', pos, i + 2, elements.concat(cx.elt('HandlebarMark_1', i, i + 2)))
+                );
+            }
+        }
+    }
+
+    let depth = 1;
+    let depthCycle = 1;
+
+    for (let i = pos + 2; i < cx.end; i++) {
+        const ch = cx.char(i);
+
+        // Opening nested handlebar: '{{'
+        if (ch === OPEN_BRACE && cx.char(i + 1) === OPEN_BRACE) {
+            depth++;
+            elements.push(cx.elt(getDepthMarker(depthCycle), i, i + 2));
+            depthCycle = (depthCycle + 1) % DEPTH_MARKERS.length;
+            i++;
+            continue;
+        }
+
+        // Closing nested handlebar: '}}'
+        if (ch === CLOSE_BRACE && cx.char(i + 1) === CLOSE_BRACE) {
+            depth--;
+
+            if (depth === 0) {
+                return cx.addElement(
+                    cx.elt('Handlebar', pos, i + 2, elements.concat(cx.elt('HandlebarMark_1', i, i + 2)))
+                );
+            }
+
+            depthCycle = (depthCycle - 1 + DEPTH_MARKERS.length) % DEPTH_MARKERS.length;
+            elements.push(cx.elt(getDepthMarker(depthCycle), i, i + 2));
+            i++;
+            continue;
+        }
+
+        // Argument separator: '::'
+        if (ch === COLON && cx.char(i + 1) === COLON) {
+            elements.push(cx.elt('HandlebarLabelMark', i, i + 2));
+            i++;
+            continue;
+        }
+    }
+
+    return -1;
 }
 
 /** @type { import('@lezer/markdown').MarkdownConfig } */
 export const macroHandlebars = {
     defineNodes: [
-        {
-            name: "Handlebar",
-            style: t.labelName
-        },
-        {
-            name: "HandlebarMark_1",
-            style: t.link
-        },
-        {
-            name: "HandlebarMark_2",
-            style: t.color
-        },
-        {
-            name: "HandlebarMark_3",
-            style: t.typeName
-        },
-        {
-            name: "HandlebarLabelMark",
-            style: t.processingInstruction
-        }
+        {name: 'Handlebar', style: t.labelName},
+        {name: 'HandlebarMark_1', style: t.link},
+        {name: 'HandlebarMark_2', style: t.color},
+        {name: 'HandlebarMark_3', style: t.typeName},
+        {name: 'HandlebarLabelMark', style: t.processingInstruction},
     ],
     parseInline: [{
-        name: "Handlebar",
+        name: 'Handlebar',
         parse(cx, next, pos) {
-            if (next != 123 /* '{' */ || cx.char(pos + 1) != 123 || cx.char(pos + 2) == 123) return -1;
-            let elts = [cx.elt("HandlebarMark_1", pos, pos + 2)];
-
-            // Closing macro mark + handlebars.js mark handling.
-            if ((cx.char(pos + 2) == 47 /* '/' */ && cx.char(pos + 3) != 47) || cx.char(pos + 2) == 35 /* '#' */) {
-                elts.push(cx.elt("HandlebarLabelMark", pos + 2, pos + 3));
-            } else if (cx.char(pos + 2) == 47 /* '/' */ && cx.char(pos + 3) == 47 && cx.char(pos + 4) == 32 /* ' ' */) {
-                for (let i = pos + 5; i < cx.end; i++) {
-                    let next = cx.char(i);
-
-                    if (next == 125 && cx.char(i + 1) == 125) { // If we're at the end of the comment, return it.
-                        return cx.addElement(
-                            cx.elt(
-                                "Comment",
-                                pos, i + 2,
-                                elts.concat(cx.elt("HandlebarMark_1", i, i + 2))
-                            )
-                        );
-                    }
-                }
-            }
-
-            let   depth = 1
-                , depthCycle = 1;
-            for (let i = pos + 2; i < cx.end; i++) {
-                let next = cx.char(i);
-
-                // Nested depth handling.
-                if (next == 123 && cx.char(i + 1) == 123) { // Increase nested depth.
-                    depth++;
-
-                    // Have nested handlebar colors cycle for better readability.
-                    switch (depthCycle) {
-                        case 0:
-                            elts.push(cx.elt("HandlebarMark_1", i, i + 2));
-                            depthCycle++;
-                            break;
-                        case 1:
-                            elts.push(cx.elt("HandlebarMark_2", i, i + 2));
-                            depthCycle++;
-                            break;
-                        case 2:
-                            elts.push(cx.elt("HandlebarMark_3", i, i + 2));
-                            depthCycle = 0;
-                            break;
-                    }
-
-                    i++; // Skip the next '{' as we've already consumed it.
-                    continue;
-                } else if (next == 125 && cx.char(i + 1) == 125) { // Decrease nested depth.
-                    depth--;
-
-
-                    if (depth == 0) { // If we're at the end of the top-level handlebar, return it.
-                        return cx.addElement(
-                            cx.elt(
-                                "Handlebar",
-                                pos, i + 2,
-                                elts.concat(cx.elt("HandlebarMark_1", i, i + 2))
-                            )
-                        );
-                    } else {
-                        // Have nested handlebar mark colors cycle for better readability.
-                        switch (depthCycle) {
-                            case 1:
-                                elts.push(cx.elt("HandlebarMark_1", i, i + 2));
-                                depthCycle--;
-                                break;
-                            case 2:
-                                elts.push(cx.elt("HandlebarMark_2", i, i + 2));
-                                depthCycle--;
-                                break;
-                            case 0:
-                                elts.push(cx.elt("HandlebarMark_3", i, i + 2));
-                                depthCycle = 2;
-                                break;
-                        }
-                    }
-
-                    i++; // Skip the next '}' as we've already consumed it.
-                    continue;
-                }
-
-                // Argument mark handling.
-                if (next == 58 /* ':' */ && cx.char(i + 1) == 58) {
-                    elts.push(cx.elt("HandlebarLabelMark", i, i + 2));
-
-                    i++; // Skip the next ':' as we've already consumed it.
-                    continue;
-                }
-            }
-        }
+            return parseHandlebar(cx, next, pos);
+        },
     }],
-    // parseBlock: [
-    //     {
-    //         name: "handlebars_blocks",
-    //         parse(cx, line) {
-
-    //         }
-    //     }
-    // ],
 };
